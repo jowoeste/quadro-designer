@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create vite@latest app -- --template react-ts)",
+      "Bash(echo \"PATH: $PATH\")",
+      "Bash(export PATH=\"/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin\")",
+      "Bash(export PATH=\"/opt/homebrew/bin:/usr/bin:/bin\")",
+      "Bash(npm install)",
+      "Bash(npm install three @react-three/fiber @react-three/drei zustand)",
+      "Bash(npm install --save-dev @types/three)"
+    ]
+  }
+}
