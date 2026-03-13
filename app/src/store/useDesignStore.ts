@@ -12,13 +12,21 @@
 //   history/future    — undo/redo stacks (snapshots of parts[])
 //
 // UNDO/REDO:
-//   Before every mutating action (place, delete), we push a deep copy of `parts` to `history`.
+//   Before every mutating action (place, delete, rotate), we push a deep copy of `parts` to `history`.
 //   Undo pops from history, pushes current state to future. Redo does the reverse.
 
 import { create } from 'zustand';
+import * as THREE from 'three';
 import type { PlacedPart, PartType, SnapResult, Connection } from '../types/parts';
 import { initConnections } from '../geometry/portDefs';
-import { saveDesign, loadDesign } from '../utils/storage';
+import { saveDesignByName, loadDesignByName } from '../utils/storage';
+import {
+  axis90Quat,
+  canRotate,
+  collectRigidSubtree,
+  composeQuaternions,
+  rotatePositionAroundPivot,
+} from '../utils/rotation';
 
 // Unique ID generator — simple counter, reset-safe via loadDesign
 let _idCounter = 0;
@@ -51,6 +59,9 @@ interface DesignStore {
   isSnapping: boolean;
   snapResult: SnapResult | null;
 
+  // Pre-placement rotation: user's accumulated rotation for the ghost preview
+  previewQuaternion: [number, number, number, number];
+
   // Undo/redo history stacks
   history: PlacedPart[][];
   future: PlacedPart[][];
@@ -65,10 +76,13 @@ interface DesignStore {
   ) => void;
   placePart: () => void;
   deleteSelectedPart: () => void;
+  rotatePreview: (axis: 'x' | 'y' | 'z') => void;
+  rotatePlacedPart: (axis: 'x' | 'y' | 'z') => void;
   undo: () => void;
   redo: () => void;
-  save: () => void;
-  load: () => void;
+  saveByName: (name: string) => void;
+  loadByName: (name: string) => boolean;
+  clearDesign: () => void;
 }
 
 export const useDesignStore = create<DesignStore>((set, get) => ({
@@ -79,12 +93,13 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
   ghostQuaternion: [0, 0, 0, 1], // identity quaternion
   isSnapping: false,
   snapResult: null,
+  previewQuaternion: [0, 0, 0, 1], // identity — reset on type change or placement
   history: [],
   future: [],
 
-  // Enter/exit placement mode. Clears any existing selection.
+  // Enter/exit placement mode. Clears any existing selection + resets preview rotation.
   selectPartType: (type) =>
-    set({ selectedPartType: type, selectedPartId: null }),
+    set({ selectedPartType: type, selectedPartId: null, previewQuaternion: [0, 0, 0, 1] }),
 
   // Select an existing part (for delete/highlight). Exits placement mode.
   selectExistingPart: (id) =>
@@ -148,6 +163,7 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
       history: [...state.history, cloneParts(state.parts)], // save for undo
       future: [],                                            // clear redo stack
       parts: [...updatedParts, newPart],
+      previewQuaternion: [0, 0, 0, 1],                      // reset rotation after placement
     });
   },
 
@@ -177,6 +193,72 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
     });
   },
 
+  // Rotate the preview ghost by 90° around the given axis.
+  // Only works for connector types (tubes are symmetric and don't need rotation).
+  rotatePreview: (axis) => {
+    const state = get();
+    if (!state.selectedPartType) return;
+    if (state.selectedPartType === 'tube') return; // tubes don't rotate
+
+    const current = new THREE.Quaternion(
+      state.previewQuaternion[0], state.previewQuaternion[1],
+      state.previewQuaternion[2], state.previewQuaternion[3]
+    );
+    const rot = axis90Quat(axis);
+    // newPreview = rot * current (apply new rotation on top of existing)
+    const result = rot.multiply(current);
+    set({ previewQuaternion: [result.x, result.y, result.z, result.w] });
+  },
+
+  // Rotate a placed connector by 90° around the given axis.
+  // Checks connection constraints, pushes to history for undo, and
+  // rigidly rotates all parts connected through non-axis ports.
+  rotatePlacedPart: (axis) => {
+    const state = get();
+    if (!state.selectedPartId) return;
+
+    const part = state.parts.find(p => p.id === state.selectedPartId);
+    if (!part) return;
+    if (part.type === 'tube') return; // tubes don't rotate independently
+
+    // Check rotation constraint based on connected tube axes
+    if (!canRotate(part, axis)) return;
+
+    const rotQuat = axis90Quat(axis);
+
+    // Collect all parts that should move rigidly with this rotation
+    const subtreeIds = collectRigidSubtree(part, axis, state.parts);
+    const subtreeSet = new Set(subtreeIds);
+
+    // Build updated parts array with rotated transforms
+    const updatedParts = state.parts.map(p => {
+      if (p.id === part.id) {
+        // The connector itself: only quaternion changes (it rotates in place)
+        return {
+          ...p,
+          connections: { ...p.connections },
+          quaternion: composeQuaternions(rotQuat, p.quaternion),
+        };
+      }
+      if (subtreeSet.has(p.id)) {
+        // Subtree part: both position and quaternion change (rigid rotation around connector center)
+        return {
+          ...p,
+          connections: { ...p.connections },
+          position: rotatePositionAroundPivot(p.position, part.position, rotQuat),
+          quaternion: composeQuaternions(rotQuat, p.quaternion),
+        };
+      }
+      return p;
+    });
+
+    set({
+      history: [...state.history, cloneParts(state.parts)], // save for undo
+      future: [],                                            // clear redo stack
+      parts: updatedParts,
+    });
+  },
+
   // Undo: restore previous state, push current to future stack
   undo: () => {
     const state = get();
@@ -203,20 +285,16 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
     });
   },
 
-  // Save current design to localStorage
-  save: () => {
+  // Save current design by name to localStorage
+  saveByName: (name) => {
     const { parts } = get();
-    saveDesign(parts);
-    alert(`Design saved! (${parts.length} parts)`);
+    saveDesignByName(name, parts);
   },
 
-  // Load a previously saved design from localStorage
-  load: () => {
-    const loaded = loadDesign();
-    if (!loaded) {
-      alert('No saved design found.');
-      return;
-    }
+  // Load a named design from localStorage. Returns true if found.
+  loadByName: (name) => {
+    const loaded = loadDesignByName(name);
+    if (!loaded) return false;
     set({
       parts: loaded,
       history: [],
@@ -224,6 +302,17 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
       selectedPartId: null,
       selectedPartType: null,
     });
-    alert(`Loaded ${loaded.length} parts.`);
+    return true;
+  },
+
+  // Clear the current design (New Design)
+  clearDesign: () => {
+    set({
+      parts: [],
+      history: [],
+      future: [],
+      selectedPartId: null,
+      selectedPartType: null,
+    });
   },
 }));

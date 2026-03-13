@@ -61,14 +61,23 @@ export const FIVE_WAY_PORTS: PortDef[] = [
   { id: 'E', position: [0,  P,  0], direction: [ 0, 1,  0] }, // up
 ];
 
+// 3-way spatial (Raumkupplung 3-armig): 3 ports in perpendicular directions (+X, +Y, +Z)
+// Like the corner of a cube — needed for building 3D structures (cube corners, house corners)
+export const THREE_WAY_SPATIAL_PORTS: PortDef[] = [
+  { id: 'A', position: [P, 0, 0], direction: [1, 0, 0] }, // right
+  { id: 'B', position: [0, P, 0], direction: [0, 1, 0] }, // up
+  { id: 'C', position: [0, 0, P], direction: [0, 0, 1] }, // forward
+];
+
 // Lookup: get port definitions for any part type
 export function getPortDefs(type: PartType): PortDef[] {
   switch (type) {
-    case 'tube':        return TUBE_PORTS;
-    case 'elbow':       return ELBOW_PORTS;
-    case 't-connector': return T_CONNECTOR_PORTS;
-    case 'cross':       return CROSS_PORTS;
-    case '5-way':       return FIVE_WAY_PORTS;
+    case 'tube':           return TUBE_PORTS;
+    case 'elbow':          return ELBOW_PORTS;
+    case 't-connector':    return T_CONNECTOR_PORTS;
+    case 'cross':          return CROSS_PORTS;
+    case '5-way':          return FIVE_WAY_PORTS;
+    case '3-way-spatial':  return THREE_WAY_SPATIAL_PORTS;
   }
 }
 

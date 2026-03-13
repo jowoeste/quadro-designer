@@ -8,7 +8,7 @@
 //   - SnapResult: what the snap system returns when a snap is detected
 
 // All connector and tube types supported in Phase 1
-export type PartType = 'tube' | 'elbow' | 't-connector' | 'cross' | '5-way';
+export type PartType = 'tube' | 'elbow' | 't-connector' | 'cross' | '5-way' | '3-way-spatial';
 
 // A port definition in LOCAL (part) space.
 // Ports are the attachment points where tubes connect to connectors.

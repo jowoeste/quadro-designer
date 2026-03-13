@@ -27,11 +27,12 @@ export const PORT_INDICATOR_RADIUS = 0.016;
 
 // === PART COLORS (Phase 1: simple solid colors, no textures) ===
 export const PART_COLORS: Record<string, string> = {
-  tube: '#4a90d9',          // Steel blue
-  elbow: '#e67e22',         // Orange
-  't-connector': '#2ecc71', // Green
-  cross: '#9b59b6',         // Purple
-  '5-way': '#e74c3c',       // Red
+  tube: '#4a90d9',              // Steel blue
+  elbow: '#e67e22',             // Orange
+  't-connector': '#2ecc71',     // Green
+  cross: '#9b59b6',             // Purple
+  '5-way': '#e74c3c',           // Red
+  '3-way-spatial': '#1abc9c',   // Teal — distinct from flat T-connector (green)
 };
 
 export const SELECTED_COLOR = '#f1c40f';      // Yellow: selected part highlight

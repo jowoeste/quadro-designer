@@ -8,16 +8,25 @@
 //       ground plane mesh – invisible, captures pointer events for part placement
 //       <PartMesh> × N    – each placed part
 //       <GhostPart>       – semi-transparent placement preview (shown during placement mode)
+//       <GizmoHelper>     – XYZ coordinate axes indicator in the corner
 //
 // CLICK VS DRAG:
 //   OrbitControls captures drag for camera movement, but a click event fires even after drags.
 //   To distinguish real clicks from drag-releases, we compare the pointer's screen position
 //   between pointerdown and click. If it moved more than 5px, it was a drag → ignore the click.
+//
+// 3D SNAPPING:
+//   Snap detection uses the camera ray (e.ray) instead of the ground-plane cursor position.
+//   This allows snapping to ports at any height — vertical tubes, elevated connectors, etc.
+//
+// INSTANT ROTATION PREVIEW:
+//   When previewQuaternion changes (user presses X/Y/Z), a useEffect immediately recalculates
+//   the ghost position using the stored last ray. No need to wait for a pointer move event.
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { OrbitControls, GizmoHelper, GizmoViewport } from '@react-three/drei';
 import * as THREE from 'three';
 import { useDesignStore } from '../store/useDesignStore';
 import { PartMesh } from './PartMesh';
@@ -33,6 +42,7 @@ function SceneContent() {
   const ghostPosition = useDesignStore(s => s.ghostPosition);
   const ghostQuaternion = useDesignStore(s => s.ghostQuaternion);
   const isSnapping = useDesignStore(s => s.isSnapping);
+  const previewQuaternion = useDesignStore(s => s.previewQuaternion);
   const updateGhost = useDesignStore(s => s.updateGhost);
   const placePart = useDesignStore(s => s.placePart);
   const selectExistingPart = useDesignStore(s => s.selectExistingPart);
@@ -41,6 +51,10 @@ function SceneContent() {
   // If the pointer moved more than 5px between pointerdown and click, it was a drag.
   const pointerDownPos = useRef<{ x: number; y: number } | null>(null);
 
+  // Store last cursor position and ray for instant rotation preview updates
+  const lastCursorPos = useRef<THREE.Vector3 | null>(null);
+  const lastRay = useRef<THREE.Ray | null>(null);
+
   // Pointer move on ground plane → update ghost position + snap check
   const handlePointerMove = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
@@ -48,19 +62,50 @@ function SceneContent() {
       e.stopPropagation();
 
       const cursor = e.point; // world-space intersection with ground plane
+      const ray = e.ray;      // camera ray through mouse position
 
-      // Check if the cursor is near an open port (snap check)
-      const snap = checkSnap(cursor, selectedPartType, parts);
+      // Store for instant rotation preview recalculation
+      lastCursorPos.current = cursor.clone();
+      lastRay.current = ray.clone();
+
+      // Build THREE.Quaternion from the user's preview rotation (X/Y/Z key presses)
+      const pq = new THREE.Quaternion(
+        previewQuaternion[0], previewQuaternion[1],
+        previewQuaternion[2], previewQuaternion[3]
+      );
+
+      // Check if the cursor ray is near an open port (3D snap check)
+      const snap = checkSnap(ray, selectedPartType, parts, pq);
 
       if (snap) {
         updateGhost(snap.position, snap.quaternion, snap);
       } else {
-        // No snap: show ghost at cursor position, default orientation (identity quaternion)
-        updateGhost([cursor.x, cursor.y, cursor.z], [0, 0, 0, 1], null);
+        // No snap: show ghost at cursor position with the user's preview rotation
+        updateGhost([cursor.x, cursor.y, cursor.z], previewQuaternion, null);
       }
     },
-    [selectedPartType, parts, updateGhost]
+    [selectedPartType, parts, updateGhost, previewQuaternion]
   );
+
+  // INSTANT ROTATION PREVIEW: when previewQuaternion changes via X/Y/Z key,
+  // immediately recalculate the ghost without waiting for a pointer move event.
+  useEffect(() => {
+    if (!selectedPartType || !lastRay.current) return;
+
+    const pq = new THREE.Quaternion(
+      previewQuaternion[0], previewQuaternion[1],
+      previewQuaternion[2], previewQuaternion[3]
+    );
+
+    const snap = checkSnap(lastRay.current, selectedPartType, parts, pq);
+
+    if (snap) {
+      updateGhost(snap.position, snap.quaternion, snap);
+    } else if (lastCursorPos.current) {
+      const c = lastCursorPos.current;
+      updateGhost([c.x, c.y, c.z], previewQuaternion, null);
+    }
+  }, [previewQuaternion, selectedPartType, parts, updateGhost]);
 
   // Record screen position on pointer down (for drag detection)
   const handlePointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
@@ -134,6 +179,11 @@ function SceneContent() {
 
       {/* ── Camera controls ── */}
       <OrbitControls enableDamping dampingFactor={0.08} />
+
+      {/* ── Coordinate system indicator (P5) ── */}
+      <GizmoHelper alignment="bottom-right" margin={[60, 60]}>
+        <GizmoViewport axisColors={['#e74c3c', '#2ecc71', '#3498db']} labelColor="white" />
+      </GizmoHelper>
     </>
   );
 }

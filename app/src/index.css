@@ -149,9 +149,138 @@ kbd {
   background: #718096;
 }
 
+.new-design-btn {
+  background: #553c9a;
+  border-color: #6b46c1;
+}
+
+.new-design-btn:hover {
+  background: #6b46c1;
+}
+
 .part-count {
   font-size: 11px;
   color: #718096;
+}
+
+/* ── Save Row (input + button inline) ── */
+
+.save-row {
+  display: flex;
+  gap: 4px;
+}
+
+.save-input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #4a5568;
+  border-radius: 6px;
+  background: #1a202c;
+  color: #e2e8f0;
+  font-size: 12px;
+  outline: none;
+  min-width: 0;
+}
+
+.save-input::placeholder {
+  color: #718096;
+}
+
+.save-input:focus {
+  border-color: #4a90d9;
+}
+
+.save-btn {
+  width: auto;
+  padding: 6px 12px;
+  flex-shrink: 0;
+}
+
+.save-message {
+  font-size: 11px;
+  color: #68d391;
+  font-style: italic;
+}
+
+/* ── Saved Designs List ── */
+
+.saved-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+
+.saved-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 6px 8px;
+  background: #1a202c;
+  border: 1px solid #4a5568;
+  border-radius: 4px;
+}
+
+.saved-item-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.saved-item-name {
+  font-size: 12px;
+  color: #e2e8f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.saved-item-meta {
+  font-size: 10px;
+  color: #718096;
+}
+
+.saved-item-actions {
+  display: flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.small-btn {
+  padding: 3px 8px;
+  border: 1px solid #4a5568;
+  border-radius: 4px;
+  background: #4a5568;
+  color: #f7fafc;
+  cursor: pointer;
+  font-size: 11px;
+  transition: background 0.15s;
+}
+
+.small-btn:hover {
+  background: #718096;
+}
+
+.load-btn {
+  background: #2b6cb0;
+  border-color: #3182ce;
+}
+
+.load-btn:hover {
+  background: #3182ce;
+}
+
+.delete-btn {
+  background: #742a2a;
+  border-color: #9b2c2c;
+  font-weight: bold;
+}
+
+.delete-btn:hover {
+  background: #9b2c2c;
 }
 
 /* ── Canvas Container ── */
@@ -160,6 +289,63 @@ kbd {
   flex: 1;
   position: relative;
   height: 100%;
+}
+
+/* ── Floating Toolbar (P6) ── */
+
+.toolbar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  padding: 6px 10px;
+  border-radius: 10px;
+  z-index: 10;
+}
+
+.toolbar-btn {
+  padding: 5px 10px;
+  border: 1px solid #4a5568;
+  border-radius: 6px;
+  background: #2d3748;
+  color: #e2e8f0;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.toolbar-btn:hover:not(:disabled) {
+  background: #4a5568;
+  border-color: #718096;
+}
+
+.toolbar-btn:disabled,
+.toolbar-btn.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.delete-toolbar-btn:not(:disabled) {
+  border-color: #9b2c2c;
+  color: #fc8181;
+}
+
+.delete-toolbar-btn:hover:not(:disabled) {
+  background: #742a2a;
+}
+
+.toolbar-sep {
+  width: 1px;
+  height: 20px;
+  background: #4a5568;
+  margin: 0 4px;
 }
 
 /* ── Placement Hint Overlay ── */
@@ -180,4 +366,15 @@ kbd {
 
 .placement-hint strong {
   color: #f1c40f;
+}
+
+/* ── Rotation Hints ── */
+
+.rotation-hint {
+  color: #a0aec0;
+}
+
+.rotation-active {
+  color: #00ff88;
+  font-weight: 600;
 }

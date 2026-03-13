@@ -1,34 +1,84 @@
 // src/utils/storage.ts
-// Save/load designs to browser localStorage as JSON.
-// Simple serialization — PlacedPart[] maps directly to JSON.
+// Named save/load system using browser localStorage.
+//
+// Saves are stored as a dictionary keyed by design name.
+// Each save contains: parts array, saved-at timestamp, and part count.
+//
+// STORAGE FORMAT:
+//   localStorage key: 'quadro-designs-v2'
+//   Value: JSON string of { designs: { [name]: { parts, savedAt, partCount } } }
 
 import type { PlacedPart } from '../types/parts';
 
-const STORAGE_KEY = 'quadro-design-v1';
+const STORAGE_KEY = 'quadro-designs-v2';
 
-interface SavedDesign {
+interface SavedDesignEntry {
   parts: PlacedPart[];
   savedAt: string;
-  version: number;
+  partCount: number;
 }
 
-export function saveDesign(parts: PlacedPart[]): void {
-  const data: SavedDesign = {
+interface DesignStorage {
+  designs: Record<string, SavedDesignEntry>;
+}
+
+// Read the full design store from localStorage
+function readStore(): DesignStorage {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return { designs: {} };
+  try {
+    return JSON.parse(raw) as DesignStorage;
+  } catch {
+    console.error('Failed to parse saved designs from localStorage');
+    return { designs: {} };
+  }
+}
+
+// Write the full design store to localStorage
+function writeStore(store: DesignStorage): void {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+}
+
+// Save a design by name (overwrites if name already exists)
+export function saveDesignByName(name: string, parts: PlacedPart[]): void {
+  const store = readStore();
+  store.designs[name] = {
     parts,
     savedAt: new Date().toISOString(),
-    version: 1,
+    partCount: parts.length,
   };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  writeStore(store);
 }
 
-export function loadDesign(): PlacedPart[] | null {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return null;
-  try {
-    const data = JSON.parse(raw) as SavedDesign;
-    return data.parts;
-  } catch {
-    console.error('Failed to parse saved design from localStorage');
-    return null;
-  }
+// Load a design by name — returns parts array or null if not found
+export function loadDesignByName(name: string): PlacedPart[] | null {
+  const store = readStore();
+  const entry = store.designs[name];
+  if (!entry) return null;
+  return entry.parts;
+}
+
+// List all saved designs (name, savedAt, partCount)
+export interface SavedDesignInfo {
+  name: string;
+  savedAt: string;
+  partCount: number;
+}
+
+export function listSavedDesigns(): SavedDesignInfo[] {
+  const store = readStore();
+  return Object.entries(store.designs)
+    .map(([name, entry]) => ({
+      name,
+      savedAt: entry.savedAt,
+      partCount: entry.partCount,
+    }))
+    .sort((a, b) => b.savedAt.localeCompare(a.savedAt)); // newest first
+}
+
+// Delete a saved design by name
+export function deleteSavedDesign(name: string): void {
+  const store = readStore();
+  delete store.designs[name];
+  writeStore(store);
 }
