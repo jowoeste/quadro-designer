@@ -82,3 +82,49 @@ export function deleteSavedDesign(name: string): void {
   delete store.designs[name];
   writeStore(store);
 }
+
+// ── File-based export/import ──
+
+export interface DesignFile {
+  format: 'quadro-designer';
+  version: '1.0';
+  name: string;
+  savedAt: string;
+  partCount: number;
+  parts: PlacedPart[];
+}
+
+// Serialize a design to a JSON string for file export
+export function exportDesignToJSON(name: string, parts: PlacedPart[]): string {
+  const file: DesignFile = {
+    format: 'quadro-designer',
+    version: '1.0',
+    name,
+    savedAt: new Date().toISOString(),
+    partCount: parts.length,
+    parts,
+  };
+  return JSON.stringify(file, null, 2);
+}
+
+// Parse and validate a JSON string from an imported file.
+// Returns { name, parts } on success, or null if the file is invalid.
+export function parseDesignFromJSON(json: string): { name: string; parts: PlacedPart[] } | null {
+  try {
+    const data = JSON.parse(json);
+    // Must have a parts array
+    if (!data || !Array.isArray(data.parts)) return null;
+    // Basic validation: each part needs id, type, position, quaternion, connections
+    for (const p of data.parts) {
+      if (!p.id || !p.type || !Array.isArray(p.position) || !Array.isArray(p.quaternion) || !p.connections) {
+        return null;
+      }
+    }
+    return {
+      name: typeof data.name === 'string' ? data.name : 'Imported design',
+      parts: data.parts as PlacedPart[],
+    };
+  } catch {
+    return null;
+  }
+}

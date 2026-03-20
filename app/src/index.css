@@ -196,6 +196,16 @@ kbd {
   flex-shrink: 0;
 }
 
+.file-btn {
+  padding: 6px 8px;
+  font-size: 11px;
+}
+
+.file-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .save-message {
   font-size: 11px;
   color: #68d391;

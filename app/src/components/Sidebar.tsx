@@ -6,12 +6,13 @@
 //   2. Clicking the same button again → exits placement mode (toggle behavior)
 //   3. Active part button is highlighted with blue border
 //   4. Save/Load uses named designs stored in browser localStorage
+//   5. Export/Import allows saving/loading designs as .quadro.json files
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useDesignStore } from '../store/useDesignStore';
 import type { PartType } from '../types/parts';
 import { PART_COLORS } from '../constants/geometry';
-import { listSavedDesigns, deleteSavedDesign } from '../utils/storage';
+import { listSavedDesigns, deleteSavedDesign, exportDesignToJSON, parseDesignFromJSON } from '../utils/storage';
 import type { SavedDesignInfo } from '../utils/storage';
 
 // Display labels for each part type
@@ -24,12 +25,21 @@ const PART_LIST: { type: PartType; label: string; desc: string }[] = [
   { type: '5-way',           label: '5-Way Connector',   desc: '4 horizontal + 1 vertical' },
 ];
 
+// Sanitize a name for use as a filename
+function sanitizeFilename(name: string): string {
+  return name
+    .replace(/[^a-zA-Z0-9_\- ]/g, '')
+    .replace(/\s+/g, '-')
+    .toLowerCase() || 'untitled';
+}
+
 export function Sidebar() {
   const selectedPartType = useDesignStore(s => s.selectedPartType);
   const selectPartType = useDesignStore(s => s.selectPartType);
   const parts = useDesignStore(s => s.parts);
   const saveByName = useDesignStore(s => s.saveByName);
   const loadByName = useDesignStore(s => s.loadByName);
+  const loadFromParts = useDesignStore(s => s.loadFromParts);
   const clearDesign = useDesignStore(s => s.clearDesign);
 
   // Save/Load UI state
@@ -37,6 +47,9 @@ export function Sidebar() {
   const [showLoadList, setShowLoadList] = useState(false);
   const [savedDesigns, setSavedDesigns] = useState<SavedDesignInfo[]>([]);
   const [saveMessage, setSaveMessage] = useState('');
+
+  // Hidden file input ref for import
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Show a brief status message
   function flashMessage(msg: string) {
@@ -54,6 +67,10 @@ export function Sidebar() {
     saveByName(name);
     flashMessage(`Saved "${name}"`);
     setSaveName('');
+    // Bug fix: refresh the saved list if it's currently showing
+    if (showLoadList) {
+      setSavedDesigns(listSavedDesigns());
+    }
   }
 
   // Open the load list
@@ -87,6 +104,53 @@ export function Sidebar() {
     }
     clearDesign();
     flashMessage('New design started');
+  }
+
+  // Export design as .quadro.json file download
+  function handleExport() {
+    const name = saveName.trim() || 'Untitled';
+    const json = exportDesignToJSON(name, parts);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${sanitizeFilename(name)}.quadro.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    flashMessage(`Exported "${name}"`);
+  }
+
+  // Import design from .quadro.json file
+  function handleImport() {
+    fileInputRef.current?.click();
+  }
+
+  function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = reader.result as string;
+      const parsed = parseDesignFromJSON(text);
+
+      if (!parsed) {
+        flashMessage('Invalid file format');
+        return;
+      }
+
+      // Confirm if current design has parts
+      if (parts.length > 0) {
+        if (!window.confirm('Replace current design? Unsaved changes will be lost.')) return;
+      }
+
+      loadFromParts(parsed.parts);
+      flashMessage(`Imported "${parsed.name}"`);
+    };
+    reader.readAsText(file);
+
+    // Reset the input so the same file can be re-imported
+    e.target.value = '';
   }
 
   return (
@@ -147,6 +211,34 @@ export function Sidebar() {
             Save
           </button>
         </div>
+
+        {/* Export / Import buttons */}
+        <div className="save-row">
+          <button
+            className="action-button file-btn"
+            onClick={handleExport}
+            disabled={parts.length === 0}
+            title="Download design as .quadro.json file"
+          >
+            Export JSON
+          </button>
+          <button
+            className="action-button file-btn"
+            onClick={handleImport}
+            title="Load design from .quadro.json file"
+          >
+            Import JSON
+          </button>
+        </div>
+
+        {/* Hidden file input for import */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json,.quadro.json"
+          style={{ display: 'none' }}
+          onChange={handleFileSelected}
+        />
 
         {/* Status message */}
         {saveMessage && <p className="save-message">{saveMessage}</p>}

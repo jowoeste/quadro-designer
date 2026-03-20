@@ -82,6 +82,7 @@ interface DesignStore {
   redo: () => void;
   saveByName: (name: string) => void;
   loadByName: (name: string) => boolean;
+  loadFromParts: (parts: PlacedPart[]) => void;
   clearDesign: () => void;
 }
 
@@ -303,6 +304,17 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
       selectedPartType: null,
     });
     return true;
+  },
+
+  // Load an arbitrary parts array (used by file import)
+  loadFromParts: (parts) => {
+    set({
+      parts,
+      history: [],
+      future: [],
+      selectedPartId: null,
+      selectedPartType: null,
+    });
   },
 
   // Clear the current design (New Design)
