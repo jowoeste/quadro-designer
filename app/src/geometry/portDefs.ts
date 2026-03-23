@@ -102,6 +102,8 @@ export const STRAIGHT_PORTS: PortDef[] = [
 
 // ─── Angled connector (non-90°) ──────────────────────────────
 
+// TODO: adjust diagonal arm lengths when real measurements are available
+// (the straight arm and angled arm may have different lengths)
 // Diagonal: 2-way, 45° angle between arms
 // Port A along +Z (horizontal), Port B at 45° upward-forward
 // Direction B = [0, sin(45°), cos(45°)] = [0, 0.7071, 0.7071]

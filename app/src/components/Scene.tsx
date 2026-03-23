@@ -74,8 +74,9 @@ function SceneContent() {
         previewQuaternion[2], previewQuaternion[3]
       );
 
-      // Check if the cursor ray is near an open port (3D snap check)
-      const snap = checkSnap(ray, selectedPartType, parts, pq);
+      // Check if the cursor is near an open port (3D snap check)
+      // Tubes use ray-based detection; connectors use position + orientation matching
+      const snap = checkSnap(ray, cursor, selectedPartType, parts, pq);
 
       if (snap) {
         updateGhost(snap.position, snap.quaternion, snap);
@@ -90,18 +91,18 @@ function SceneContent() {
   // INSTANT ROTATION PREVIEW: when previewQuaternion changes via X/Y/Z key,
   // immediately recalculate the ghost without waiting for a pointer move event.
   useEffect(() => {
-    if (!selectedPartType || !lastRay.current) return;
+    if (!selectedPartType || !lastRay.current || !lastCursorPos.current) return;
 
     const pq = new THREE.Quaternion(
       previewQuaternion[0], previewQuaternion[1],
       previewQuaternion[2], previewQuaternion[3]
     );
 
-    const snap = checkSnap(lastRay.current, selectedPartType, parts, pq);
+    const snap = checkSnap(lastRay.current, lastCursorPos.current, selectedPartType, parts, pq);
 
     if (snap) {
       updateGhost(snap.position, snap.quaternion, snap);
-    } else if (lastCursorPos.current) {
+    } else {
       const c = lastCursorPos.current;
       updateGhost([c.x, c.y, c.z], previewQuaternion, null);
     }
