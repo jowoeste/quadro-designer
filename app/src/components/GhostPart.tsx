@@ -41,6 +41,9 @@ function GhostConnector({ type, color }: { type: PartType; color: string }) {
   );
 }
 
+// Disable raycasting so the ghost doesn't block pointer events on the ground plane
+const noRaycast = () => null;
+
 export function GhostPart({ type, position, quaternion, isSnapping }: GhostPartProps) {
   const color = isSnapping ? SNAP_HIGHLIGHT_COLOR : PART_COLORS[type];
 
@@ -48,6 +51,7 @@ export function GhostPart({ type, position, quaternion, isSnapping }: GhostPartP
     <group
       position={position}
       quaternion={[quaternion[0], quaternion[1], quaternion[2], quaternion[3]]}
+      raycast={noRaycast}
     >
       {isTubeType(type) ? (
         <mesh rotation={[Math.PI / 2, 0, 0]}>

@@ -24,10 +24,10 @@ export const ARM_RADIUS = 0.020;              // 40 mm diameter arm (hidden insi
 export const ARM_LENGTH = 0.050;              // 50 mm arm length (hidden inside tube)
 
 // === SNAP SYSTEM ===
-export const SNAP_DISTANCE = 0.12;            // Reduced from 0.20 — parts are closer together now
+export const SNAP_DISTANCE = 0.15;            // Generous enough for easy snapping with smaller parts
 
 // === PORT INDICATORS ===
-export const PORT_INDICATOR_RADIUS = 0.012;   // Slightly smaller to fit on smaller connector sphere
+export const PORT_INDICATOR_RADIUS = 0.016;   // Visible on the connector sphere surface
 
 // === PART COLORS (Phase 2: 2 tubes + 9 connectors) ===
 export const PART_COLORS: Record<string, string> = {
