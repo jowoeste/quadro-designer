@@ -129,7 +129,7 @@ export function canRotate(
   connector: PlacedPart,
   requestedAxis: 'x' | 'y' | 'z'
 ): boolean {
-  if (connector.type === 'tube') return false;
+  if (connector.type === 'tube' || connector.type === 'tube-15') return false;
 
   const connectedAxes = getConnectedAxes(connector);
 

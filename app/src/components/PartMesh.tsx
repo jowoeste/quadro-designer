@@ -3,26 +3,17 @@
 //
 // GEOMETRY:
 //   - Tube: a cylinder aligned along Z axis (rotated from Three.js default Y-axis cylinder)
-//   - Connectors: central sphere + cylindrical arms extending toward each port
+//   - Connectors: central sphere (arms are hidden inside tubes, per real Quadro)
 //   - Port indicators: small yellow spheres at open (unconnected) ports
-//
-// SELECTION:
-//   Clicking a part mesh selects it (yellow highlight). The onClick handler calls
-//   stopPropagation() to prevent the ground plane from receiving the click too.
-//
-// NOTE on Three.js CylinderGeometry:
-//   CylinderGeometry creates a cylinder along the Y axis by default.
-//   We rotate tube geometry by 90° around X to align it with the Z axis,
-//   matching our port convention where tube axis = Z.
 
 import { useCallback } from 'react';
-import * as THREE from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { PlacedPart } from '../types/parts';
+import { isTubeType } from '../types/parts';
 import {
   PART_COLORS, SELECTED_COLOR, PORT_OPEN_COLOR,
-  CONNECTOR_BODY_RADIUS, ARM_RADIUS, PORT_OFFSET,
-  TUBE_RADIUS, TUBE_LENGTH, TUBE_HALF_LENGTH,
+  CONNECTOR_BODY_RADIUS, TUBE_RADIUS,
+  TUBE_LENGTH, TUBE_15_LENGTH,
   PORT_INDICATOR_RADIUS,
 } from '../constants/geometry';
 import { getPortDefs } from '../geometry/portDefs';
@@ -33,88 +24,41 @@ interface PartMeshProps {
   isSelected: boolean;
 }
 
-// ─── Connector Arm ───────────────────────────────────────────
-// One cylindrical arm pointing from the connector center toward a port.
-// Also renders the port indicator sphere if the port is unconnected.
-function ConnectorArm({ direction, portPosition, color, isConnected }: {
-  direction: [number, number, number];
-  portPosition: [number, number, number];
-  color: string;
-  isConnected: boolean;
-}) {
-  // CylinderGeometry is along Y. We rotate it to point in the arm direction.
-  const dir = new THREE.Vector3(...direction);
-  const quat = new THREE.Quaternion().setFromUnitVectors(
-    new THREE.Vector3(0, 1, 0),
-    dir
-  );
-
-  // Arm midpoint = halfway between connector center and port tip
-  const mid: [number, number, number] = [
-    portPosition[0] / 2,
-    portPosition[1] / 2,
-    portPosition[2] / 2,
-  ];
-
-  return (
-    <>
-      <mesh
-        position={mid}
-        quaternion={[quat.x, quat.y, quat.z, quat.w]}
-      >
-        <cylinderGeometry args={[ARM_RADIUS, ARM_RADIUS, PORT_OFFSET, 8]} />
-        <meshStandardMaterial color={color} />
-      </mesh>
-
-      {/* Open port indicator: bright yellow sphere at port tip */}
-      {!isConnected && (
-        <mesh position={portPosition}>
-          <sphereGeometry args={[PORT_INDICATOR_RADIUS, 8, 8]} />
-          <meshBasicMaterial color={PORT_OPEN_COLOR} />
-        </mesh>
-      )}
-    </>
-  );
-}
-
 // ─── Tube Body ───────────────────────────────────────────────
+// Parameterized by length to support both 35 cm and 15 cm tubes.
 function TubeBody({ part, isSelected, onClick }: {
   part: PlacedPart;
   isSelected: boolean;
   onClick: (e: ThreeEvent<MouseEvent>) => void;
 }) {
-  const color = isSelected ? SELECTED_COLOR : PART_COLORS.tube;
+  const color = isSelected ? SELECTED_COLOR : PART_COLORS[part.type];
+  const length = part.type === 'tube-15' ? TUBE_15_LENGTH : TUBE_LENGTH;
+  const portDefs = getPortDefs(part.type);
 
   return (
     <>
       {/* Main tube cylinder: rotate 90° around X to align with Z axis */}
       <mesh rotation={[Math.PI / 2, 0, 0]} onClick={onClick}>
-        <cylinderGeometry args={[TUBE_RADIUS, TUBE_RADIUS, TUBE_LENGTH, 16]} />
+        <cylinderGeometry args={[TUBE_RADIUS, TUBE_RADIUS, length, 16]} />
         <meshStandardMaterial color={color} metalness={0.3} roughness={0.6} />
       </mesh>
 
-      {/* Port A indicator (Z = -TUBE_HALF_LENGTH) */}
-      {!part.connections['A'] && (
-        <mesh position={[0, 0, -TUBE_HALF_LENGTH]}>
-          <sphereGeometry args={[PORT_INDICATOR_RADIUS, 8, 8]} />
-          <meshBasicMaterial color={PORT_OPEN_COLOR} />
-        </mesh>
-      )}
-
-      {/* Port B indicator (Z = +TUBE_HALF_LENGTH) */}
-      {!part.connections['B'] && (
-        <mesh position={[0, 0, TUBE_HALF_LENGTH]}>
-          <sphereGeometry args={[PORT_INDICATOR_RADIUS, 8, 8]} />
-          <meshBasicMaterial color={PORT_OPEN_COLOR} />
-        </mesh>
-      )}
+      {/* Port indicators at each open port */}
+      {portDefs.map(def => (
+        !part.connections[def.id] && (
+          <mesh key={def.id} position={def.position}>
+            <sphereGeometry args={[PORT_INDICATOR_RADIUS, 8, 8]} />
+            <meshBasicMaterial color={PORT_OPEN_COLOR} />
+          </mesh>
+        )
+      ))}
     </>
   );
 }
 
 // ─── Connector Body ──────────────────────────────────────────
-// Works for all connector types (elbow, T, cross, 5-way).
-// Renders the central sphere, then iterates over port definitions to draw arms.
+// Renders a central sphere + port indicators at open ports.
+// Arms are not rendered — they're hidden inside tubes in real Quadro.
 function ConnectorBody({ part, isSelected, onClick }: {
   part: PlacedPart;
   isSelected: boolean;
@@ -131,29 +75,27 @@ function ConnectorBody({ part, isSelected, onClick }: {
         <meshStandardMaterial color={color} metalness={0.2} roughness={0.7} />
       </mesh>
 
-      {/* One arm per port */}
+      {/* Port indicators at open ports */}
       {portDefs.map(def => (
-        <ConnectorArm
-          key={def.id}
-          direction={def.direction}
-          portPosition={def.position}
-          color={color}
-          isConnected={part.connections[def.id] !== null}
-        />
+        !part.connections[def.id] && (
+          <mesh key={def.id} position={def.position}>
+            <sphereGeometry args={[PORT_INDICATOR_RADIUS, 8, 8]} />
+            <meshBasicMaterial color={PORT_OPEN_COLOR} />
+          </mesh>
+        )
       ))}
     </>
   );
 }
 
 // ─── Main PartMesh component ─────────────────────────────────
-// Wraps the part geometry in a <group> with the part's world transform.
 export function PartMesh({ part, isSelected }: PartMeshProps) {
   const selectExistingPart = useDesignStore(s => s.selectExistingPart);
   const selectedPartType = useDesignStore(s => s.selectedPartType);
 
   const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
-    e.stopPropagation(); // don't let the ground plane also receive this
-    if (selectedPartType) return; // in placement mode, clicking parts does nothing
+    e.stopPropagation();
+    if (selectedPartType) return;
     selectExistingPart(part.id);
   }, [part.id, selectExistingPart, selectedPartType]);
 
@@ -162,7 +104,7 @@ export function PartMesh({ part, isSelected }: PartMeshProps) {
       position={part.position}
       quaternion={[part.quaternion[0], part.quaternion[1], part.quaternion[2], part.quaternion[3]]}
     >
-      {part.type === 'tube' ? (
+      {isTubeType(part.type) ? (
         <TubeBody part={part} isSelected={isSelected} onClick={handleClick} />
       ) : (
         <ConnectorBody part={part} isSelected={isSelected} onClick={handleClick} />

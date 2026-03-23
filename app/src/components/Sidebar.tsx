@@ -15,14 +15,22 @@ import { PART_COLORS } from '../constants/geometry';
 import { listSavedDesigns, deleteSavedDesign, exportDesignToJSON, parseDesignFromJSON } from '../utils/storage';
 import type { SavedDesignInfo } from '../utils/storage';
 
-// Display labels for each part type
+// Display labels for each part type, grouped: tubes first, then connectors
 const PART_LIST: { type: PartType; label: string; desc: string }[] = [
-  { type: 'tube',            label: 'Tube (35 cm)',      desc: 'Straight tube, 35 cm long' },
+  // Tubes
+  { type: 'tube',            label: 'Tube (35 cm)',      desc: 'Standard tube, 35 cm long' },
+  { type: 'tube-15',         label: 'Tube (15 cm)',      desc: 'Short tube, 15 cm long' },
+  // Flat connectors
+  { type: 'straight',        label: 'Straight (2-way)',  desc: '180° inline connector' },
   { type: 'elbow',           label: 'Elbow (2-way)',     desc: '90° corner connector' },
+  { type: 'diagonal',        label: 'Diagonal (45°)',    desc: '135° angled connector' },
   { type: 't-connector',     label: 'T-Piece (3-way)',   desc: '3-way flat branch connector' },
-  { type: '3-way-spatial',   label: '3-Way Spatial',     desc: '3 perpendicular arms (cube corner)' },
   { type: 'cross',           label: 'Cross (4-way)',     desc: '4-way flat connector' },
-  { type: '5-way',           label: '5-Way Connector',   desc: '4 horizontal + 1 vertical' },
+  // Spatial connectors
+  { type: '3-way-spatial',   label: '3-Way Spatial',     desc: '3 perpendicular arms (cube corner)' },
+  { type: '4-way-spatial',   label: '4-Way Spatial',     desc: 'Horizontal T + 1 up' },
+  { type: '5-way',           label: '5-Way Connector',   desc: '4 horizontal + 1 up' },
+  { type: '6-way',           label: '6-Way Connector',   desc: 'All 6 directions' },
 ];
 
 // Sanitize a name for use as a filename
@@ -156,7 +164,7 @@ export function Sidebar() {
   return (
     <div className="sidebar">
       <h2 className="sidebar-title">Quadro Designer</h2>
-      <p className="sidebar-subtitle">Phase 1 — Proof of Principle</p>
+      <p className="sidebar-subtitle">Phase 2 — Full Designer</p>
 
       {/* ── Parts palette ── */}
       <div className="sidebar-section">

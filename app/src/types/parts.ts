@@ -7,8 +7,18 @@
 //   - PlacedPart: a part placed in the 3D scene (world position + rotation + connections)
 //   - SnapResult: what the snap system returns when a snap is detected
 
-// All connector and tube types supported in Phase 1
-export type PartType = 'tube' | 'elbow' | 't-connector' | 'cross' | '5-way' | '3-way-spatial';
+// All connector and tube types supported in Phase 2A
+export type PartType =
+  | 'tube' | 'tube-15'                                               // tubes
+  | 'elbow' | 't-connector' | 'cross'                                // flat connectors
+  | '3-way-spatial' | '4-way-spatial' | '5-way' | '6-way'            // spatial connectors
+  | 'straight'                                                        // inline connector
+  | 'diagonal';                                                       // 45° connector
+
+// Helper: is this part type a tube (vs. a connector)?
+export function isTubeType(type: PartType): boolean {
+  return type === 'tube' || type === 'tube-15';
+}
 
 // A port definition in LOCAL (part) space.
 // Ports are the attachment points where tubes connect to connectors.

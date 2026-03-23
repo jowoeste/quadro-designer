@@ -10,6 +10,7 @@ import { useEffect } from 'react';
 import { Scene } from './components/Scene';
 import { Sidebar } from './components/Sidebar';
 import { useDesignStore } from './store/useDesignStore';
+import { isTubeType } from './types/parts';
 
 export default function App() {
   const undo = useDesignStore(s => s.undo);
@@ -25,7 +26,7 @@ export default function App() {
 
   // Can we rotate right now? (used for toolbar button state)
   const canRotateNow =
-    (selectedPartType !== null && selectedPartType !== 'tube') ||
+    (selectedPartType !== null && !isTubeType(selectedPartType)) ||
     selectedPartId !== null;
 
   // ── Global keyboard shortcuts ──
@@ -58,7 +59,7 @@ export default function App() {
 
       // X/Y/Z: rotate connector (preview mode or post-placement)
       if (e.key === 'x' || e.key === 'X') {
-        if (selectedPartType && selectedPartType !== 'tube') {
+        if (selectedPartType && !isTubeType(selectedPartType)) {
           e.preventDefault();
           rotatePreview('x');
         } else if (selectedPartId) {
@@ -67,7 +68,7 @@ export default function App() {
         }
       }
       if (e.key === 'y' || e.key === 'Y') {
-        if (selectedPartType && selectedPartType !== 'tube') {
+        if (selectedPartType && !isTubeType(selectedPartType)) {
           e.preventDefault();
           rotatePreview('y');
         } else if (selectedPartId) {
@@ -77,7 +78,7 @@ export default function App() {
       }
       if (e.key === 'z' || e.key === 'Z') {
         if (!ctrl) {
-          if (selectedPartType && selectedPartType !== 'tube') {
+          if (selectedPartType && !isTubeType(selectedPartType)) {
             e.preventDefault();
             rotatePreview('z');
           } else if (selectedPartId) {
@@ -94,7 +95,7 @@ export default function App() {
 
   // Handlers for toolbar buttons (same logic as keyboard shortcuts)
   function handleRotate(axis: 'x' | 'y' | 'z') {
-    if (selectedPartType && selectedPartType !== 'tube') {
+    if (selectedPartType && !isTubeType(selectedPartType)) {
       rotatePreview(axis);
     } else if (selectedPartId) {
       rotatePlacedPart(axis);

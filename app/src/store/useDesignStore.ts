@@ -18,6 +18,7 @@
 import { create } from 'zustand';
 import * as THREE from 'three';
 import type { PlacedPart, PartType, SnapResult, Connection } from '../types/parts';
+import { isTubeType } from '../types/parts';
 import { initConnections } from '../geometry/portDefs';
 import { saveDesignByName, loadDesignByName } from '../utils/storage';
 import {
@@ -199,7 +200,7 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
   rotatePreview: (axis) => {
     const state = get();
     if (!state.selectedPartType) return;
-    if (state.selectedPartType === 'tube') return; // tubes don't rotate
+    if (isTubeType(state.selectedPartType!)) return; // tubes don't rotate
 
     const current = new THREE.Quaternion(
       state.previewQuaternion[0], state.previewQuaternion[1],
@@ -220,7 +221,7 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
 
     const part = state.parts.find(p => p.id === state.selectedPartId);
     if (!part) return;
-    if (part.type === 'tube') return; // tubes don't rotate independently
+    if (isTubeType(part.type)) return; // tubes don't rotate independently
 
     // Check rotation constraint based on connected tube axes
     if (!canRotate(part, axis)) return;
