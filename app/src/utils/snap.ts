@@ -7,6 +7,8 @@
 //     points toward a nearby tube end. The user controls rotation via X/Y/Z keys.
 //     The snap system only adjusts position, never rotation.
 //
+// BOTH use camera-ray-based 3D detection so snapping works at any height.
+//
 // HOW IT WORKS:
 //   Tube placement:
 //     1. Find the nearest open connector port to the camera ray
@@ -14,10 +16,12 @@
 //     3. Position the tube center at portWorldPos + portDir * halfLength
 //
 //   Connector placement:
-//     1. Transform ghost connector ports to world space using cursor position + previewQuaternion
-//     2. For each ghost port, check if it's anti-parallel to any open tube port (dot < -0.96)
-//     3. If a match is found within SNAP_DISTANCE, offset position to align exactly
-//     4. Quaternion is UNCHANGED — the user's rotation is preserved
+//     1. Find open tube ports near the camera ray (3D, any height)
+//     2. For each nearby tube port, check if any ghost arm (in current preview
+//        rotation) is anti-parallel to it (dot < -0.96)
+//     3. If multiple arms match, pick the best direction alignment (most negative dot)
+//     4. Offset position to align the matching ports exactly
+//     5. Quaternion is UNCHANGED — the user's rotation is preserved
 
 import * as THREE from 'three';
 import type { PlacedPart, PartType, SnapResult } from '../types/parts';
@@ -111,12 +115,13 @@ export function checkTubeSnap(
   return bestSnap;
 }
 
-// ─── Connector Snap (NO auto-rotation) ───────────────────────
-// The connector keeps its current orientation (previewQuat). We check if any
-// ghost port, in that orientation, is anti-parallel to an open tube end and
-// close enough to snap. Only position is adjusted, never rotation.
+// ─── Connector Snap (NO auto-rotation, RAY-BASED 3D) ────────
+// Uses camera ray to find open tube ports at any height, then checks if any
+// ghost arm (in current preview rotation) is anti-parallel.
+// When multiple arms match, the best direction alignment wins (most negative dot).
+// Only position is adjusted, never rotation.
 export function checkConnectorSnap(
-  cursorPos: THREE.Vector3,
+  ray: THREE.Ray,
   placingType: PartType,
   previewQuat: THREE.Quaternion,
   parts: PlacedPart[]
@@ -125,42 +130,46 @@ export function checkConnectorSnap(
   const portDefs = getPortDefs(placingType);
 
   let bestSnap: SnapResult | null = null;
-  let bestDist = SNAP_DISTANCE;
+  let bestRayDist = SNAP_DISTANCE;
+  let bestDirDot = ANTI_PARALLEL_THRESHOLD; // most negative = best alignment
 
   for (const tube of tubes) {
     const openTubePorts = getWorldPorts(tube).filter(wp => !wp.isConnected);
 
     for (const tubePort of openTubePorts) {
+      // Step 1: Is the camera ray near this tube port? (3D check at any height)
+      const rayDist = ray.distanceToPoint(tubePort.worldPosition);
+      if (rayDist >= SNAP_DISTANCE) continue;
+
+      // Step 2: Check each ghost arm against this tube port
       for (const ghostPortDef of portDefs) {
-        // Transform ghost port to world space using cursor + preview rotation
+        // Ghost arm direction in world space (using preview rotation)
         const ghostPortWorldDir = new THREE.Vector3(...ghostPortDef.direction)
           .applyQuaternion(previewQuat)
           .normalize();
-        const ghostPortWorldPos = new THREE.Vector3(...ghostPortDef.position)
-          .applyQuaternion(previewQuat)
-          .add(cursorPos);
 
         // Check: do these ports face each other? (anti-parallel within ~15°)
         const dirDot = tubePort.worldDirection.dot(ghostPortWorldDir);
         if (dirDot > ANTI_PARALLEL_THRESHOLD) continue;
 
-        // Check: are they close enough?
-        const dist = tubePort.worldPosition.distanceTo(ghostPortWorldPos);
-        if (dist >= bestDist) continue;
-        bestDist = dist;
+        // Step 3: Rank — prefer closer ray distance, then better direction alignment
+        if (rayDist < bestRayDist || (rayDist <= bestRayDist + 0.001 && dirDot < bestDirDot)) {
+          bestRayDist = rayDist;
+          bestDirDot = dirDot;
 
-        // Snap! Offset position to align the ports exactly.
-        // Quaternion stays unchanged — user's rotation is preserved.
-        const offset = tubePort.worldPosition.clone().sub(ghostPortWorldPos);
-        const snapPos = cursorPos.clone().add(offset);
+          // Calculate snap position: place ghost so this port aligns exactly with tube port
+          const ghostPortLocalRotated = new THREE.Vector3(...ghostPortDef.position)
+            .applyQuaternion(previewQuat);
+          const snapPos = tubePort.worldPosition.clone().sub(ghostPortLocalRotated);
 
-        bestSnap = {
-          position: [snapPos.x, snapPos.y, snapPos.z],
-          quaternion: [previewQuat.x, previewQuat.y, previewQuat.z, previewQuat.w],
-          localPortId: ghostPortDef.id,
-          targetPartId: tube.id,
-          targetPortId: tubePort.portId,
-        };
+          bestSnap = {
+            position: [snapPos.x, snapPos.y, snapPos.z],
+            quaternion: [previewQuat.x, previewQuat.y, previewQuat.z, previewQuat.w],
+            localPortId: ghostPortDef.id,
+            targetPartId: tube.id,
+            targetPortId: tubePort.portId,
+          };
+        }
       }
     }
   }
@@ -171,7 +180,7 @@ export function checkConnectorSnap(
 // ─── Main entry point ────────────────────────────────────────
 export function checkSnap(
   ray: THREE.Ray,
-  cursorPos: THREE.Vector3,
+  _cursorPos: THREE.Vector3,  // kept for API compat (ghost position when not snapping)
   placingType: PartType,
   parts: PlacedPart[],
   previewQuat: THREE.Quaternion
@@ -179,6 +188,6 @@ export function checkSnap(
   if (isTubeType(placingType)) {
     return checkTubeSnap(ray, placingType, parts);
   } else {
-    return checkConnectorSnap(cursorPos, placingType, previewQuat, parts);
+    return checkConnectorSnap(ray, placingType, previewQuat, parts);
   }
 }

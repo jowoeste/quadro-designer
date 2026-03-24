@@ -118,9 +118,14 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
 
   // Place the current ghost part into the scene.
   // If snapping, also records bi-directional connections between the new part and the snap target.
+  // CONNECTORS can only be placed when snapping to an open tube end.
+  // TUBES can be placed freely (first part, or starting a new branch).
   placePart: () => {
     const state = get();
     if (!state.selectedPartType) return;
+
+    // Connectors require a snap target — can't float in empty space
+    if (!isTubeType(state.selectedPartType) && !state.snapResult) return;
 
     const { ghostPosition, ghostQuaternion, snapResult, selectedPartType } = state;
 
