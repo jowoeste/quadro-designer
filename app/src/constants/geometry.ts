@@ -23,6 +23,15 @@ export const PORT_OFFSET = 0.025;             // Tube end sits 25 mm from center
 export const ARM_RADIUS = 0.020;              // 40 mm diameter arm (hidden inside tube)
 export const ARM_LENGTH = 0.050;              // 50 mm arm length (hidden inside tube)
 
+// === DIAGONAL CONNECTOR DIMENSIONS ===
+// The diagonal (45°) connector is unique: Port A is a sleeve (slides over a connector arm),
+// Port B is a standard arm (tubes connect to it). Origin = crossing point of both axes.
+export const DIAG_SLEEVE_LENGTH = 0.070;      // 70mm horizontal sleeve
+export const DIAG_CROSSING_TO_CLOSED = 0.010; // 10mm from origin to closed end
+export const DIAG_PORT_A_OFFSET = 0.080;      // 80mm from origin to sleeve open end
+export const DIAG_PORT_B_BODY_END = 0.060;    // 60mm from origin to where arm (40mm⌀) begins
+export const DIAG_ARM_TOTAL = 0.110;          // 110mm from origin to diagonal open end
+
 // === SNAP SYSTEM ===
 export const SNAP_DISTANCE = 0.15;            // Generous enough for easy snapping with smaller parts
 

@@ -6,22 +6,10 @@
 //   - CONNECTORS: keep the user's chosen orientation. Only snap if an arm already
 //     points toward a nearby tube end. The user controls rotation via X/Y/Z keys.
 //     The snap system only adjusts position, never rotation.
+//   - DIAGONAL: Port A (sleeve) snaps to connector arms, not tube ends.
+//     Port B (arm) snaps to tube ends like any other connector arm.
 //
 // BOTH use camera-ray-based 3D detection so snapping works at any height.
-//
-// HOW IT WORKS:
-//   Tube placement:
-//     1. Find the nearest open connector port to the camera ray
-//     2. Auto-rotate the tube to align with that port's direction
-//     3. Position the tube center at portWorldPos + portDir * halfLength
-//
-//   Connector placement:
-//     1. Find open tube ports near the camera ray (3D, any height)
-//     2. For each nearby tube port, check if any ghost arm (in current preview
-//        rotation) is anti-parallel to it (dot < -0.96)
-//     3. If multiple arms match, pick the best direction alignment (most negative dot)
-//     4. Offset position to align the matching ports exactly
-//     5. Quaternion is UNCHANGED — the user's rotation is preserved
 
 import * as THREE from 'three';
 import type { PlacedPart, PartType, SnapResult } from '../types/parts';
@@ -76,6 +64,7 @@ export function getWorldPorts(part: PlacedPart): WorldPort[] {
 // ─── Tube Snap ───────────────────────────────────────────────
 // Tubes are symmetric → auto-rotate to align with the connector port direction.
 // Uses camera ray distance for 3D snap detection.
+// SKIPS sleeve-type ports — a tube cannot connect to a diagonal's Port A.
 export function checkTubeSnap(
   ray: THREE.Ray,
   placingType: PartType,
@@ -88,7 +77,13 @@ export function checkTubeSnap(
   let bestDist = SNAP_DISTANCE;
 
   for (const connector of connectors) {
-    const openPorts = getWorldPorts(connector).filter(wp => !wp.isConnected);
+    const connPortDefs = getPortDefs(connector.type);
+    const openPorts = getWorldPorts(connector).filter(wp => {
+      if (wp.isConnected) return false;
+      // Skip sleeve-type ports — tubes can't connect there
+      const def = connPortDefs.find(d => d.id === wp.portId);
+      return !def || def.portType !== 'sleeve';
+    });
 
     for (const port of openPorts) {
       const dist = ray.distanceToPoint(port.worldPosition);
@@ -116,8 +111,9 @@ export function checkTubeSnap(
 }
 
 // ─── Connector Snap (NO auto-rotation, RAY-BASED 3D) ────────
-// Uses camera ray to find open tube ports at any height, then checks if any
-// ghost arm (in current preview rotation) is anti-parallel.
+// Two-pass snap:
+//   Pass 1: arm-type ghost ports → open TUBE ends
+//   Pass 2: sleeve-type ghost ports → open CONNECTOR arms
 // When multiple arms match, the best direction alignment wins (most negative dot).
 // Only position is adjusted, never rotation.
 export function checkConnectorSnap(
@@ -126,51 +122,73 @@ export function checkConnectorSnap(
   previewQuat: THREE.Quaternion,
   parts: PlacedPart[]
 ): SnapResult | null {
-  const tubes = parts.filter(p => isTubeType(p.type));
-  const portDefs = getPortDefs(placingType);
+  const allPortDefs = getPortDefs(placingType);
+  const armPortDefs = allPortDefs.filter(d => d.portType !== 'sleeve');
+  const sleevePortDefs = allPortDefs.filter(d => d.portType === 'sleeve');
 
   let bestSnap: SnapResult | null = null;
   let bestRayDist = SNAP_DISTANCE;
   let bestDirDot = ANTI_PARALLEL_THRESHOLD; // most negative = best alignment
 
-  for (const tube of tubes) {
-    const openTubePorts = getWorldPorts(tube).filter(wp => !wp.isConnected);
-
-    for (const tubePort of openTubePorts) {
-      // Step 1: Is the camera ray near this tube port? (3D check at any height)
-      const rayDist = ray.distanceToPoint(tubePort.worldPosition);
+  // Helper: try snapping ghost port defs against target world ports
+  function trySnap(
+    targetPorts: WorldPort[],
+    ghostPortDefs: typeof allPortDefs,
+    targetPartId: string
+  ) {
+    for (const targetPort of targetPorts) {
+      const rayDist = ray.distanceToPoint(targetPort.worldPosition);
       if (rayDist >= SNAP_DISTANCE) continue;
 
-      // Step 2: Check each ghost arm against this tube port
-      for (const ghostPortDef of portDefs) {
-        // Ghost arm direction in world space (using preview rotation)
-        const ghostPortWorldDir = new THREE.Vector3(...ghostPortDef.direction)
+      for (const ghostPortDef of ghostPortDefs) {
+        const ghostDir = new THREE.Vector3(...ghostPortDef.direction)
           .applyQuaternion(previewQuat)
           .normalize();
 
-        // Check: do these ports face each other? (anti-parallel within ~15°)
-        const dirDot = tubePort.worldDirection.dot(ghostPortWorldDir);
+        const dirDot = targetPort.worldDirection.dot(ghostDir);
         if (dirDot > ANTI_PARALLEL_THRESHOLD) continue;
 
-        // Step 3: Rank — prefer closer ray distance, then better direction alignment
+        // Rank: prefer closer ray distance, then better direction alignment
         if (rayDist < bestRayDist || (rayDist <= bestRayDist + 0.001 && dirDot < bestDirDot)) {
           bestRayDist = rayDist;
           bestDirDot = dirDot;
 
-          // Calculate snap position: place ghost so this port aligns exactly with tube port
-          const ghostPortLocalRotated = new THREE.Vector3(...ghostPortDef.position)
-            .applyQuaternion(previewQuat);
-          const snapPos = tubePort.worldPosition.clone().sub(ghostPortLocalRotated);
+          const offset = new THREE.Vector3(...ghostPortDef.position).applyQuaternion(previewQuat);
+          const snapPos = targetPort.worldPosition.clone().sub(offset);
 
           bestSnap = {
             position: [snapPos.x, snapPos.y, snapPos.z],
             quaternion: [previewQuat.x, previewQuat.y, previewQuat.z, previewQuat.w],
             localPortId: ghostPortDef.id,
-            targetPartId: tube.id,
-            targetPortId: tubePort.portId,
+            targetPartId,
+            targetPortId: targetPort.portId,
           };
         }
       }
+    }
+  }
+
+  // ─── Pass 1: arm ports → open TUBE ends ───
+  if (armPortDefs.length > 0) {
+    const tubes = parts.filter(p => isTubeType(p.type));
+    for (const tube of tubes) {
+      const openTubePorts = getWorldPorts(tube).filter(wp => !wp.isConnected);
+      trySnap(openTubePorts, armPortDefs, tube.id);
+    }
+  }
+
+  // ─── Pass 2: sleeve ports → open CONNECTOR arms ───
+  if (sleevePortDefs.length > 0) {
+    const connectors = parts.filter(p => !isTubeType(p.type));
+    for (const connector of connectors) {
+      const connPortDefs = getPortDefs(connector.type);
+      const openConnPorts = getWorldPorts(connector).filter(wp => {
+        if (wp.isConnected) return false;
+        // Only snap to arm-type ports (sleeve can't snap to another sleeve)
+        const def = connPortDefs.find(d => d.id === wp.portId);
+        return !def || def.portType !== 'sleeve';
+      });
+      trySnap(openConnPorts, sleevePortDefs, connector.id);
     }
   }
 

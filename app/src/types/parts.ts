@@ -29,6 +29,9 @@ export interface PortDef {
   position: [number, number, number];
   // Unit vector pointing away from the part (determines tube attachment direction)
   direction: [number, number, number];
+  // 'arm' (default) = standard connector arm, tubes connect here
+  // 'sleeve' = tube-like sleeve, connects to a connector arm (only diagonal Port A)
+  portType?: 'arm' | 'sleeve';
 }
 
 // A live connection between two parts (recorded on both sides).

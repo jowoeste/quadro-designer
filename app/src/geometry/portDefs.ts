@@ -12,7 +12,7 @@
 //   Connector arms point along ±X, ±Y, ±Z depending on connector type
 
 import type { PartType, PortDef } from '../types/parts';
-import { PORT_OFFSET, TUBE_HALF_LENGTH, TUBE_15_HALF_LENGTH } from '../constants/geometry';
+import { PORT_OFFSET, TUBE_HALF_LENGTH, TUBE_15_HALF_LENGTH, DIAG_PORT_A_OFFSET, DIAG_PORT_B_BODY_END } from '../constants/geometry';
 
 const P = PORT_OFFSET; // shorthand for readability
 
@@ -102,16 +102,16 @@ export const STRAIGHT_PORTS: PortDef[] = [
 
 // ─── Angled connector (non-90°) ──────────────────────────────
 
-// TODO: adjust diagonal arm lengths when real measurements are available
-// (the straight arm and angled arm may have different lengths)
-// Diagonal: 2-way, 45° angle between arms
-// Port A along +Z (horizontal), Port B at 45° upward-forward
+// Diagonal (45°): 2-way with sleeve + arm
+// Port A = horizontal sleeve (slides over a connector arm, NOT a tube)
+// Port B = diagonal arm at 45° upward-forward (standard arm, tubes connect here)
+// Origin = crossing point of the two axes
 // Direction B = [0, sin(45°), cos(45°)] = [0, 0.7071, 0.7071]
 // Angle check: dot(A_dir, B_dir) = dot([0,0,1], [0, 0.7071, 0.7071]) = 0.7071
 //   arccos(0.7071) = 45° ✓
 export const DIAGONAL_PORTS: PortDef[] = [
-  { id: 'A', position: [0, 0, P],              direction: [0, 0, 1] },
-  { id: 'B', position: [0, P * S45, P * S45],  direction: [0, S45, S45] },
+  { id: 'A', position: [0, 0, DIAG_PORT_A_OFFSET],                            direction: [0, 0, 1],     portType: 'sleeve' },
+  { id: 'B', position: [0, DIAG_PORT_B_BODY_END * S45, DIAG_PORT_B_BODY_END * S45], direction: [0, S45, S45], portType: 'arm' },
 ];
 
 // ─── Lookup ──────────────────────────────────────────────────
