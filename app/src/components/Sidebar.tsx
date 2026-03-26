@@ -1,17 +1,22 @@
 // src/components/Sidebar.tsx
-// Left sidebar showing available parts, save/load controls, and keyboard reference.
+// Left sidebar showing available parts with inventory counters,
+// inventory configuration, save/load controls, and keyboard reference.
 //
 // UI flow:
 //   1. User clicks a part button → enters placement mode (selectedPartType is set)
 //   2. Clicking the same button again → exits placement mode (toggle behavior)
 //   3. Active part button is highlighted with blue border
-//   4. Save/Load uses named designs stored in browser localStorage
-//   5. Export/Import allows saving/loading designs as .quadro.json files
+//   4. When inventory is enabled, part buttons show "used / available" counts
+//   5. Depleted parts are greyed out and cannot be selected
+//   6. Save/Load uses named designs stored in browser localStorage
+//   7. Export/Import allows saving/loading designs as .quadro.json files
 
 import { useState, useRef } from 'react';
 import { useDesignStore } from '../store/useDesignStore';
+import { useInventoryStore, countUsedParts } from '../store/useInventoryStore';
 import type { PartType } from '../types/parts';
 import { PART_COLORS } from '../constants/geometry';
+import { QUADRO_PACKAGES } from '../data/packages';
 import { listSavedDesigns, deleteSavedDesign, exportDesignToJSON, parseDesignFromJSON } from '../utils/storage';
 import type { SavedDesignInfo } from '../utils/storage';
 
@@ -31,6 +36,10 @@ const PART_LIST: { type: PartType; label: string; desc: string }[] = [
   { type: '4-way-spatial',   label: '4-Way Spatial',     desc: 'Horizontal T + 1 up' },
   { type: '5-way',           label: '5-Way Connector',   desc: '4 horizontal + 1 up' },
   { type: '6-way',           label: '6-Way Connector',   desc: 'All 6 directions' },
+  // Panels & clamps
+  { type: 'panel-40x40',           label: 'Panel (40×40)',     desc: 'Flat panel, 40×40 cm' },
+  { type: 'panel-40x20',           label: 'Panel (40×20)',     desc: 'Half panel, 40×20 cm' },
+  { type: 'double-tube-connector', label: 'Tube Clamp',        desc: 'Connects two parallel tubes' },
 ];
 
 // Sanitize a name for use as a filename
@@ -50,11 +59,23 @@ export function Sidebar() {
   const loadFromParts = useDesignStore(s => s.loadFromParts);
   const clearDesign = useDesignStore(s => s.clearDesign);
 
-  // Save/Load UI state
+  // Inventory store
+  const inventoryEnabled = useInventoryStore(s => s.enabled);
+  const toggleEnabled = useInventoryStore(s => s.toggleEnabled);
+  const ownedPackages = useInventoryStore(s => s.ownedPackages);
+  const extraParts = useInventoryStore(s => s.extraParts);
+  const addPackage = useInventoryStore(s => s.addPackage);
+  const removePackage = useInventoryStore(s => s.removePackage);
+  const setExtraParts = useInventoryStore(s => s.setExtraParts);
+  const getAvailable = useInventoryStore(s => s.getAvailable);
+
+  // UI state
   const [saveName, setSaveName] = useState('');
   const [showLoadList, setShowLoadList] = useState(false);
   const [savedDesigns, setSavedDesigns] = useState<SavedDesignInfo[]>([]);
   const [saveMessage, setSaveMessage] = useState('');
+  const [showInventoryConfig, setShowInventoryConfig] = useState(false);
+  const [showExtraParts, setShowExtraParts] = useState(false);
 
   // Hidden file input ref for import
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -65,7 +86,40 @@ export function Sidebar() {
     setTimeout(() => setSaveMessage(''), 2000);
   }
 
-  // Save the current design
+  // ── Part availability helpers ──
+
+  function getUsedCount(partType: PartType): number {
+    return countUsedParts(parts, partType);
+  }
+
+  function getAvailableCount(partType: PartType): number {
+    return getAvailable(partType);
+  }
+
+  /** True when used count exceeds available inventory (need to buy more) */
+  function isOverInventory(partType: PartType): boolean {
+    if (!inventoryEnabled) return false;
+    return getUsedCount(partType) > getAvailableCount(partType);
+  }
+
+  function handlePartClick(type: PartType) {
+    selectPartType(selectedPartType === type ? null : type);
+  }
+
+  /** Build shopping list: parts where used > available */
+  function getShoppingList(): { type: PartType; label: string; toBuy: number }[] {
+    if (!inventoryEnabled) return [];
+    return PART_LIST
+      .map(({ type, label }) => ({
+        type,
+        label,
+        toBuy: getUsedCount(type) - getAvailableCount(type),
+      }))
+      .filter(item => item.toBuy > 0);
+  }
+
+  // ── Save/Load handlers ──
+
   function handleSave() {
     const name = saveName.trim();
     if (!name) {
@@ -75,19 +129,16 @@ export function Sidebar() {
     saveByName(name);
     flashMessage(`Saved "${name}"`);
     setSaveName('');
-    // Bug fix: refresh the saved list if it's currently showing
     if (showLoadList) {
       setSavedDesigns(listSavedDesigns());
     }
   }
 
-  // Open the load list
   function handleShowLoadList() {
     setSavedDesigns(listSavedDesigns());
     setShowLoadList(!showLoadList);
   }
 
-  // Load a specific design
   function handleLoad(name: string) {
     const success = loadByName(name);
     if (success) {
@@ -98,14 +149,12 @@ export function Sidebar() {
     }
   }
 
-  // Delete a saved design
   function handleDelete(name: string) {
     deleteSavedDesign(name);
-    setSavedDesigns(listSavedDesigns()); // refresh list
+    setSavedDesigns(listSavedDesigns());
     flashMessage(`Deleted "${name}"`);
   }
 
-  // New design (clear)
   function handleNewDesign() {
     if (parts.length > 0) {
       if (!window.confirm('Clear current design? Unsaved changes will be lost.')) return;
@@ -114,7 +163,6 @@ export function Sidebar() {
     flashMessage('New design started');
   }
 
-  // Export design as .quadro.json file download
   function handleExport() {
     const name = saveName.trim() || 'Untitled';
     const json = exportDesignToJSON(name, parts);
@@ -128,7 +176,6 @@ export function Sidebar() {
     flashMessage(`Exported "${name}"`);
   }
 
-  // Import design from .quadro.json file
   function handleImport() {
     fileInputRef.current?.click();
   }
@@ -147,7 +194,6 @@ export function Sidebar() {
         return;
       }
 
-      // Confirm if current design has parts
       if (parts.length > 0) {
         if (!window.confirm('Replace current design? Unsaved changes will be lost.')) return;
       }
@@ -156,9 +202,13 @@ export function Sidebar() {
       flashMessage(`Imported "${parsed.name}"`);
     };
     reader.readAsText(file);
-
-    // Reset the input so the same file can be re-imported
     e.target.value = '';
+  }
+
+  // ── Render helper: package quantity for display ──
+
+  function getOwnedQuantity(packageId: string): number {
+    return ownedPackages.find(p => p.packageId === packageId)?.quantity ?? 0;
   }
 
   return (
@@ -166,21 +216,134 @@ export function Sidebar() {
       <h2 className="sidebar-title">Quadro Designer</h2>
       <p className="sidebar-subtitle">Phase 2 — Full Designer</p>
 
+      {/* ── Inventory toggle ── */}
+      <div className="sidebar-section">
+        <div className="inventory-header">
+          <h3>Inventory</h3>
+          <label className="toggle-switch" title={inventoryEnabled ? 'Inventory constraints ON' : 'Inventory constraints OFF'}>
+            <input
+              type="checkbox"
+              checked={inventoryEnabled}
+              onChange={toggleEnabled}
+            />
+            <span className="toggle-slider" />
+          </label>
+        </div>
+
+        {inventoryEnabled && (
+          <>
+            <button
+              className="action-button inventory-config-btn"
+              onClick={() => setShowInventoryConfig(!showInventoryConfig)}
+            >
+              {showInventoryConfig ? 'Hide Packages' : 'Configure Packages'}
+            </button>
+
+            {showInventoryConfig && (
+              <div className="inventory-config">
+                {/* Package list */}
+                <div className="package-list">
+                  {QUADRO_PACKAGES.map(pkg => {
+                    const qty = getOwnedQuantity(pkg.id);
+                    return (
+                      <div key={pkg.id} className={`package-row ${qty > 0 ? 'owned' : ''}`}>
+                        <span className="package-name" title={pkg.nameDe || pkg.name}>
+                          {pkg.name}
+                        </span>
+                        <div className="package-qty-controls">
+                          <button
+                            className="qty-btn"
+                            onClick={() => removePackage(pkg.id)}
+                            disabled={qty === 0}
+                          >
+                            −
+                          </button>
+                          <span className="qty-value">{qty}</span>
+                          <button
+                            className="qty-btn"
+                            onClick={() => addPackage(pkg.id)}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Extra parts toggle */}
+                <button
+                  className="action-button extra-parts-btn"
+                  onClick={() => setShowExtraParts(!showExtraParts)}
+                >
+                  {showExtraParts ? 'Hide Extra Parts' : 'Add Extra Parts'}
+                </button>
+
+                {showExtraParts && (
+                  <div className="extra-parts-list">
+                    {PART_LIST.map(({ type, label }) => (
+                      <div key={type} className="extra-part-row">
+                        <span className="extra-part-label">{label}</span>
+                        <input
+                          className="extra-part-input"
+                          type="number"
+                          min="0"
+                          value={extraParts[type] ?? 0}
+                          onChange={e => setExtraParts(type, Math.max(0, parseInt(e.target.value) || 0))}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
       {/* ── Parts palette ── */}
       <div className="sidebar-section">
         <h3>Parts</h3>
         <p className="hint">Click a part, then click in the 3D scene to place it.</p>
-        {PART_LIST.map(({ type, label, desc }) => (
-          <button
-            key={type}
-            className={`part-button ${selectedPartType === type ? 'active' : ''}`}
-            onClick={() => selectPartType(selectedPartType === type ? null : type)}
-            title={desc}
-          >
-            <span className="part-color-dot" style={{ backgroundColor: PART_COLORS[type] }} />
-            <span className="part-label">{label}</span>
-          </button>
-        ))}
+        {PART_LIST.map(({ type, label, desc }) => {
+          const used = getUsedCount(type);
+          const available = inventoryEnabled ? getAvailableCount(type) : -1;
+          const over = isOverInventory(type);
+
+          return (
+            <button
+              key={type}
+              className={`part-button ${selectedPartType === type ? 'active' : ''} ${over ? 'over-inventory' : ''}`}
+              onClick={() => handlePartClick(type)}
+              title={desc}
+            >
+              <span className="part-color-dot" style={{ backgroundColor: PART_COLORS[type] }} />
+              <span className="part-label">{label}</span>
+              {inventoryEnabled && (
+                <span className={`part-count-badge ${over ? 'over' : ''}`}>
+                  {used}/{available}
+                </span>
+              )}
+            </button>
+          );
+        })}
+
+        {/* Shopping list: parts to buy */}
+        {(() => {
+          const shoppingList = getShoppingList();
+          if (shoppingList.length === 0) return null;
+          return (
+            <div className="shopping-list">
+              <div className="shopping-list-header">To buy:</div>
+              {shoppingList.map(({ type, label, toBuy }) => (
+                <div key={type} className="shopping-list-item">
+                  <span>{label}</span>
+                  <span className="shopping-list-qty">+{toBuy}</span>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
       </div>
 
       {/* ── Keyboard shortcuts reference ── */}
@@ -195,6 +358,7 @@ export function Sidebar() {
           <div><kbd>Ctrl+Shift+Z</kbd> Redo</div>
           <div><kbd>Esc</kbd> Cancel placement</div>
           <div><kbd>X</kbd><kbd>Y</kbd><kbd>Z</kbd> Rotate connector</div>
+          <div><kbd>45°/90°</kbd> Toggle in toolbar</div>
         </div>
       </div>
 

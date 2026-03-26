@@ -114,21 +114,30 @@ export const DIAGONAL_PORTS: PortDef[] = [
   { id: 'B', position: [0, DIAG_PORT_B_BODY_END * S45, DIAG_PORT_B_BODY_END * S45], direction: [0, S45, S45], portType: 'arm' },
 ];
 
+// ─── Panels & clamps (no ports — use clamp snap) ──────────────
+
+export const PANEL_40X40_PORTS: PortDef[] = [];
+export const PANEL_40X20_PORTS: PortDef[] = [];
+export const DOUBLE_TUBE_CONNECTOR_PORTS: PortDef[] = [];
+
 // ─── Lookup ──────────────────────────────────────────────────
 
 export function getPortDefs(type: PartType): PortDef[] {
   switch (type) {
-    case 'tube':           return TUBE_PORTS;
-    case 'tube-15':        return TUBE_15_PORTS;
-    case 'elbow':          return ELBOW_PORTS;
-    case 't-connector':    return T_CONNECTOR_PORTS;
-    case 'cross':          return CROSS_PORTS;
-    case '3-way-spatial':  return THREE_WAY_SPATIAL_PORTS;
-    case '4-way-spatial':  return FOUR_WAY_SPATIAL_PORTS;
-    case '5-way':          return FIVE_WAY_PORTS;
-    case '6-way':          return SIX_WAY_PORTS;
-    case 'straight':       return STRAIGHT_PORTS;
-    case 'diagonal':       return DIAGONAL_PORTS;
+    case 'tube':                    return TUBE_PORTS;
+    case 'tube-15':                 return TUBE_15_PORTS;
+    case 'elbow':                   return ELBOW_PORTS;
+    case 't-connector':             return T_CONNECTOR_PORTS;
+    case 'cross':                   return CROSS_PORTS;
+    case '3-way-spatial':           return THREE_WAY_SPATIAL_PORTS;
+    case '4-way-spatial':           return FOUR_WAY_SPATIAL_PORTS;
+    case '5-way':                   return FIVE_WAY_PORTS;
+    case '6-way':                   return SIX_WAY_PORTS;
+    case 'straight':                return STRAIGHT_PORTS;
+    case 'diagonal':                return DIAGONAL_PORTS;
+    case 'panel-40x40':             return PANEL_40X40_PORTS;
+    case 'panel-40x20':             return PANEL_40X20_PORTS;
+    case 'double-tube-connector':   return DOUBLE_TUBE_CONNECTOR_PORTS;
   }
 }
 

@@ -18,11 +18,12 @@
 import { create } from 'zustand';
 import * as THREE from 'three';
 import type { PlacedPart, PartType, SnapResult, Connection } from '../types/parts';
-import { isTubeType } from '../types/parts';
+import { isTubeType, isPanelType } from '../types/parts';
 import { initConnections } from '../geometry/portDefs';
+import { findAdditionalConnections } from '../utils/snap';
 import { saveDesignByName, loadDesignByName } from '../utils/storage';
 import {
-  axis90Quat,
+  axisRotationQuat,
   canRotate,
   collectRigidSubtree,
   composeQuaternions,
@@ -63,11 +64,15 @@ interface DesignStore {
   // Pre-placement rotation: user's accumulated rotation for the ghost preview
   previewQuaternion: [number, number, number, number];
 
+  // Fine rotation toggle: 45° steps instead of 90°
+  fineRotation: boolean;
+
   // Undo/redo history stacks
   history: PlacedPart[][];
   future: PlacedPart[][];
 
   // Actions
+  toggleFineRotation: () => void;
   selectPartType: (type: PartType | null) => void;
   selectExistingPart: (id: string | null) => void;
   updateGhost: (
@@ -96,8 +101,12 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
   isSnapping: false,
   snapResult: null,
   previewQuaternion: [0, 0, 0, 1], // identity — reset on type change or placement
+  fineRotation: false,
   history: [],
   future: [],
+
+  // Toggle between 90° and 45° rotation steps
+  toggleFineRotation: () => set(s => ({ fineRotation: !s.fineRotation })),
 
   // Enter/exit placement mode. Clears any existing selection + resets preview rotation.
   selectPartType: (type) =>
@@ -124,7 +133,7 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
     const state = get();
     if (!state.selectedPartType) return;
 
-    // Connectors require a snap target — can't float in empty space
+    // Connectors and panels require a snap target — can't float in empty space
     if (!isTubeType(state.selectedPartType) && !state.snapResult) return;
 
     const { ghostPosition, ghostQuaternion, snapResult, selectedPartType } = state;
@@ -141,7 +150,16 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
     // Clone existing parts (we'll update connections on the snap target)
     let updatedParts = cloneParts(state.parts);
 
-    if (snapResult) {
+    if (isPanelType(selectedPartType)) {
+      // Panels don't create port connections — they store clampedTo instead.
+      // The snap result encodes tubeB id in targetPortId as "body:tubeBId"
+      if (snapResult) {
+        const tubeBId = snapResult.targetPortId.startsWith('body:')
+          ? snapResult.targetPortId.slice(5)
+          : '';
+        newPart.clampedTo = { tubeAId: snapResult.targetPartId, tubeBId };
+      }
+    } else if (snapResult) {
       // Record connection on the NEW part's port
       newPart.connections[snapResult.localPortId] = {
         toPartId: snapResult.targetPartId,
@@ -164,6 +182,37 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
         }
         return p;
       });
+
+      // Check for additional port alignments (e.g. tube placed between two connectors
+      // snaps to one end, but the other end also aligns with another open port)
+      const additionalConns = findAdditionalConnections(
+        newPart,
+        updatedParts,
+        snapResult.localPortId
+      );
+
+      for (const ac of additionalConns) {
+        newPart.connections[ac.localPortId] = {
+          toPartId: ac.targetPartId,
+          toPortId: ac.targetPortId,
+        };
+
+        updatedParts = updatedParts.map(p => {
+          if (p.id === ac.targetPartId) {
+            return {
+              ...p,
+              connections: {
+                ...p.connections,
+                [ac.targetPortId]: {
+                  toPartId: newPart.id,
+                  toPortId: ac.localPortId,
+                } as Connection,
+              },
+            };
+          }
+          return p;
+        });
+      }
     }
 
     set({
@@ -179,9 +228,18 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
     const state = get();
     if (!state.selectedPartId) return;
 
-    // Remove the part, and clear any connections other parts had to it
+    const deletedId = state.selectedPartId!;
+
+    // Remove the part + any panels/clamps clamped to it, and clear connections
     const updatedParts = state.parts
-      .filter(p => p.id !== state.selectedPartId)
+      .filter(p => {
+        if (p.id === deletedId) return false;
+        // Cascade: remove panels/clamps clamped to the deleted tube
+        if (p.clampedTo && (p.clampedTo.tubeAId === deletedId || p.clampedTo.tubeBId === deletedId)) {
+          return false;
+        }
+        return true;
+      })
       .map(p => {
         const newConns = { ...p.connections };
         for (const [portId, conn] of Object.entries(newConns)) {
@@ -200,7 +258,7 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
     });
   },
 
-  // Rotate the preview ghost by 90° around the given axis.
+  // Rotate the preview ghost by 90° (or 45° when fineRotation is on) around the given axis.
   // Only works for connector types (tubes are symmetric and don't need rotation).
   rotatePreview: (axis) => {
     const state = get();
@@ -211,7 +269,7 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
       state.previewQuaternion[0], state.previewQuaternion[1],
       state.previewQuaternion[2], state.previewQuaternion[3]
     );
-    const rot = axis90Quat(axis);
+    const rot = axisRotationQuat(axis, state.fineRotation);
     // newPreview = rot * current (apply new rotation on top of existing)
     const result = rot.multiply(current);
     set({ previewQuaternion: [result.x, result.y, result.z, result.w] });
@@ -231,7 +289,7 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
     // Check rotation constraint based on connected tube axes
     if (!canRotate(part, axis)) return;
 
-    const rotQuat = axis90Quat(axis);
+    const rotQuat = axisRotationQuat(axis, state.fineRotation);
 
     // Collect all parts that should move rigidly with this rotation
     const subtreeIds = collectRigidSubtree(part, axis, state.parts);

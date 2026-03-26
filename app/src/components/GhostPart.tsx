@@ -4,14 +4,15 @@
 
 import * as THREE from 'three';
 import type { PartType } from '../types/parts';
-import { isTubeType } from '../types/parts';
+import { isTubeType, isPanelType } from '../types/parts';
 import {
   PART_COLORS, SNAP_HIGHLIGHT_COLOR,
-  CONNECTOR_BODY_RADIUS, TUBE_RADIUS,
+  CONNECTOR_BODY_RADIUS, TUBE_RADIUS, ARM_RADIUS,
   TUBE_LENGTH, TUBE_15_LENGTH,
   PORT_INDICATOR_RADIUS, PORT_OPEN_COLOR,
   DIAG_CROSSING_TO_CLOSED, DIAG_PORT_A_OFFSET,
-  DIAG_ARM_TOTAL,
+  DIAG_PORT_B_BODY_END, DIAG_ARM_TOTAL,
+  PANEL_40_SIZE, PANEL_20_SIZE, PANEL_THICKNESS, DOUBLE_TUBE_SIZE,
 } from '../constants/geometry';
 import { getPortDefs } from '../geometry/portDefs';
 
@@ -61,9 +62,14 @@ function GhostDiagonal({ type, color }: { type: PartType; color: string }) {
   const sleeveCenterZ = (sleeveStart + sleeveEnd) / 2;
 
   const diagStartT = DIAG_CROSSING_TO_CLOSED / S45;
-  const diagEndT = DIAG_ARM_TOTAL;
-  const diagLength = diagEndT - diagStartT;
-  const diagMidT = (diagStartT + diagEndT) / 2;
+  const diagBodyEndT = DIAG_PORT_B_BODY_END;
+  const diagBodyLength = diagBodyEndT - diagStartT;
+  const diagBodyMidT = (diagStartT + diagBodyEndT) / 2;
+
+  const diagArmStartT = DIAG_PORT_B_BODY_END;
+  const diagArmEndT = DIAG_ARM_TOTAL;
+  const diagArmLength = diagArmEndT - diagArmStartT;
+  const diagArmMidT = (diagArmStartT + diagArmEndT) / 2;
 
   return (
     <>
@@ -73,12 +79,21 @@ function GhostDiagonal({ type, color }: { type: PartType; color: string }) {
         <meshStandardMaterial color={color} transparent opacity={0.5} depthWrite={false} />
       </mesh>
 
-      {/* Diagonal section */}
+      {/* Diagonal body section — 50mm diameter */}
       <mesh
-        position={[0, diagMidT * S45, diagMidT * S45]}
+        position={[0, diagBodyMidT * S45, diagBodyMidT * S45]}
         quaternion={[DIAG_QUAT.x, DIAG_QUAT.y, DIAG_QUAT.z, DIAG_QUAT.w]}
       >
-        <cylinderGeometry args={[TUBE_RADIUS, TUBE_RADIUS, diagLength, 16]} />
+        <cylinderGeometry args={[TUBE_RADIUS, TUBE_RADIUS, diagBodyLength, 16]} />
+        <meshStandardMaterial color={color} transparent opacity={0.5} depthWrite={false} />
+      </mesh>
+
+      {/* Diagonal arm section — 40mm diameter, tubes connect here */}
+      <mesh
+        position={[0, diagArmMidT * S45, diagArmMidT * S45]}
+        quaternion={[DIAG_QUAT.x, DIAG_QUAT.y, DIAG_QUAT.z, DIAG_QUAT.w]}
+      >
+        <cylinderGeometry args={[ARM_RADIUS, ARM_RADIUS, diagArmLength, 16]} />
         <meshStandardMaterial color={color} transparent opacity={0.5} depthWrite={false} />
       </mesh>
 
@@ -90,6 +105,21 @@ function GhostDiagonal({ type, color }: { type: PartType; color: string }) {
         </mesh>
       ))}
     </>
+  );
+}
+
+// Ghost panel: flat box — semi-transparent
+function GhostPanel({ type, color }: { type: PartType; color: string }) {
+  const dims: [number, number, number] =
+    type === 'panel-40x40' ? [PANEL_40_SIZE, PANEL_THICKNESS, PANEL_40_SIZE] :
+    type === 'panel-40x20' ? [PANEL_40_SIZE, PANEL_THICKNESS, PANEL_20_SIZE] :
+    DOUBLE_TUBE_SIZE;
+
+  return (
+    <mesh>
+      <boxGeometry args={dims} />
+      <meshStandardMaterial color={color} transparent opacity={0.5} depthWrite={false} />
+    </mesh>
   );
 }
 
@@ -114,6 +144,8 @@ export function GhostPart({ type, position, quaternion, isSnapping }: GhostPartP
           ]} />
           <meshStandardMaterial color={color} transparent opacity={0.5} depthWrite={false} />
         </mesh>
+      ) : isPanelType(type) ? (
+        <GhostPanel type={type} color={color} />
       ) : type === 'diagonal' ? (
         <GhostDiagonal type={type} color={color} />
       ) : (

@@ -26,8 +26,8 @@ html, body, #root {
 /* ── Sidebar ── */
 
 .sidebar {
-  width: 220px;
-  min-width: 220px;
+  width: 240px;
+  min-width: 240px;
   height: 100%;
   background: #2d3748;
   border-right: 1px solid #4a5568;
@@ -110,6 +110,262 @@ html, body, #root {
 
 .part-label {
   flex: 1;
+}
+
+/* ── Part Button — Inventory States ── */
+
+.part-button.over-inventory {
+  border-color: #c05621;
+}
+
+.part-count-badge {
+  font-size: 10px;
+  color: #a0aec0;
+  background: #2d3748;
+  padding: 1px 5px;
+  border-radius: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.part-count-badge.over {
+  color: #fbd38d;
+  background: #652b19;
+}
+
+/* ── Shopping List ── */
+
+.shopping-list {
+  margin-top: 4px;
+  padding: 6px 8px;
+  background: #652b1933;
+  border: 1px solid #c0562155;
+  border-radius: 6px;
+}
+
+.shopping-list-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: #fbd38d;
+  margin-bottom: 3px;
+}
+
+.shopping-list-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #a0aec0;
+  padding: 1px 0;
+}
+
+.shopping-list-qty {
+  color: #fbd38d;
+  font-weight: 600;
+}
+
+/* ── Inventory Section ── */
+
+.inventory-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #4a5568;
+}
+
+.inventory-header h3 {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+/* Toggle switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: #4a5568;
+  border-radius: 20px;
+  transition: background 0.2s;
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  left: 3px;
+  bottom: 3px;
+  background: #e2e8f0;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background: #38a169;
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(16px);
+}
+
+/* Inventory config panel */
+.inventory-config {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.inventory-config-btn {
+  font-size: 11px;
+  padding: 5px 8px;
+}
+
+.extra-parts-btn {
+  font-size: 11px;
+  padding: 5px 8px;
+  background: #553c9a;
+  border-color: #6b46c1;
+}
+
+.extra-parts-btn:hover {
+  background: #6b46c1;
+}
+
+/* Package list */
+.package-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.package-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #718096;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.package-row.owned {
+  color: #e2e8f0;
+  background: #2b4c7e22;
+}
+
+.package-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.package-qty-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.qty-btn {
+  width: 20px;
+  height: 20px;
+  border: 1px solid #4a5568;
+  border-radius: 4px;
+  background: #2d3748;
+  color: #e2e8f0;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.qty-btn:hover:not(:disabled) {
+  background: #4a5568;
+}
+
+.qty-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.qty-value {
+  width: 18px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+/* Extra parts list */
+.extra-parts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.extra-part-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 6px;
+  font-size: 11px;
+  color: #a0aec0;
+}
+
+.extra-part-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.extra-part-input {
+  width: 48px;
+  padding: 2px 4px;
+  border: 1px solid #4a5568;
+  border-radius: 4px;
+  background: #1a202c;
+  color: #e2e8f0;
+  font-size: 11px;
+  text-align: center;
+  outline: none;
+}
+
+.extra-part-input:focus {
+  border-color: #4a90d9;
+}
+
+/* Hide number input spinners for cleaner look */
+.extra-part-input::-webkit-inner-spin-button,
+.extra-part-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.extra-part-input[type=number] {
+  -moz-appearance: textfield;
 }
 
 /* ── Controls Hint ── */
@@ -349,6 +605,18 @@ kbd {
 
 .delete-toolbar-btn:hover:not(:disabled) {
   background: #742a2a;
+}
+
+.toggle-btn {
+  font-weight: 700;
+  min-width: 38px;
+  text-align: center;
+}
+
+.toggle-btn.active {
+  background: #2b6cb0;
+  border-color: #3182ce;
+  color: #fff;
 }
 
 .toolbar-sep {

@@ -7,17 +7,24 @@
 //   - PlacedPart: a part placed in the 3D scene (world position + rotation + connections)
 //   - SnapResult: what the snap system returns when a snap is detected
 
-// All connector and tube types supported in Phase 2A
+// All part types supported in the Quadro Designer
 export type PartType =
   | 'tube' | 'tube-15'                                               // tubes
   | 'elbow' | 't-connector' | 'cross'                                // flat connectors
   | '3-way-spatial' | '4-way-spatial' | '5-way' | '6-way'            // spatial connectors
   | 'straight'                                                        // inline connector
-  | 'diagonal';                                                       // 45° connector
+  | 'diagonal'                                                        // 45° connector
+  | 'panel-40x40' | 'panel-40x20'                                    // panels
+  | 'double-tube-connector';                                          // tube clamp
 
 // Helper: is this part type a tube (vs. a connector)?
 export function isTubeType(type: PartType): boolean {
   return type === 'tube' || type === 'tube-15';
+}
+
+// Helper: is this a panel or clamp type? (uses clamp snap, not port snap)
+export function isPanelType(type: PartType): boolean {
+  return type === 'panel-40x40' || type === 'panel-40x20' || type === 'double-tube-connector';
 }
 
 // A port definition in LOCAL (part) space.
@@ -53,6 +60,8 @@ export interface PlacedPart {
   quaternion: [number, number, number, number];
   // Map from portId → Connection | null (null = open/unconnected)
   connections: Record<string, Connection | null>;
+  // For panel/clamp parts: which two tubes they clamp onto
+  clampedTo?: { tubeAId: string; tubeBId: string };
 }
 
 // Result returned by the snap system.

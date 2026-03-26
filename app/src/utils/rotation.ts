@@ -18,16 +18,22 @@ import { getPortDefs } from '../geometry/portDefs';
 // ── Axis Rotation Quaternion ──────────────────────────────────
 
 /**
- * Create a quaternion representing a 90° rotation around the given world axis.
+ * Create a quaternion representing a rotation around the given world axis.
+ * Supports 90° (default) and 45° steps via the `fine` parameter.
  * Used for both pre-placement preview rotation and post-placement in-place rotation.
  */
-export function axis90Quat(axis: 'x' | 'y' | 'z'): THREE.Quaternion {
-  const angle = Math.PI / 2;
+export function axisRotationQuat(axis: 'x' | 'y' | 'z', fine: boolean = false): THREE.Quaternion {
+  const angle = fine ? Math.PI / 4 : Math.PI / 2; // 45° or 90°
   switch (axis) {
     case 'x': return new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), angle);
     case 'y': return new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle);
     case 'z': return new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), angle);
   }
+}
+
+/** @deprecated Use axisRotationQuat instead. Kept for backward compatibility. */
+export function axis90Quat(axis: 'x' | 'y' | 'z'): THREE.Quaternion {
+  return axisRotationQuat(axis, false);
 }
 
 // ── Snap + Preview Composition ────────────────────────────────

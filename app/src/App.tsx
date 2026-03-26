@@ -23,6 +23,8 @@ export default function App() {
   const rotatePlacedPart = useDesignStore(s => s.rotatePlacedPart);
   const previewQuaternion = useDesignStore(s => s.previewQuaternion);
   const selectExistingPart = useDesignStore(s => s.selectExistingPart);
+  const fineRotation = useDesignStore(s => s.fineRotation);
+  const toggleFineRotation = useDesignStore(s => s.toggleFineRotation);
 
   // Can we rotate right now? (used for toolbar button state)
   const canRotateNow =
@@ -118,9 +120,16 @@ export default function App() {
           </button>
           <span className="toolbar-sep" />
           <button
+            className={`toolbar-btn toggle-btn ${fineRotation ? 'active' : ''}`}
+            onClick={toggleFineRotation}
+            title={`Rotation step: ${fineRotation ? '45°' : '90°'} (click to toggle)`}
+          >
+            {fineRotation ? '45°' : '90°'}
+          </button>
+          <button
             className={`toolbar-btn ${canRotateNow ? '' : 'disabled'}`}
             onClick={() => handleRotate('x')}
-            title="Rotate X axis"
+            title={`Rotate X axis (${fineRotation ? '45°' : '90°'})`}
             disabled={!canRotateNow}
           >
             Rot X
@@ -128,7 +137,7 @@ export default function App() {
           <button
             className={`toolbar-btn ${canRotateNow ? '' : 'disabled'}`}
             onClick={() => handleRotate('y')}
-            title="Rotate Y axis"
+            title={`Rotate Y axis (${fineRotation ? '45°' : '90°'})`}
             disabled={!canRotateNow}
           >
             Rot Y
@@ -136,7 +145,7 @@ export default function App() {
           <button
             className={`toolbar-btn ${canRotateNow ? '' : 'disabled'}`}
             onClick={() => handleRotate('z')}
-            title="Rotate Z axis"
+            title={`Rotate Z axis (${fineRotation ? '45°' : '90°'})`}
             disabled={!canRotateNow}
           >
             Rot Z
@@ -157,7 +166,7 @@ export default function App() {
           <div className="placement-hint">
             Placing: <strong>{selectedPartType}</strong>
             {selectedPartType !== 'tube' && (
-              <span className="rotation-hint"> · X/Y/Z to rotate</span>
+              <span className="rotation-hint"> · X/Y/Z to rotate ({fineRotation ? '45°' : '90°'})</span>
             )}
             {selectedPartType !== 'tube' &&
              (previewQuaternion[0] !== 0 || previewQuaternion[1] !== 0 ||

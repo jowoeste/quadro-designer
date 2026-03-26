@@ -9,15 +9,16 @@
 import { useCallback } from 'react';
 import type { ThreeEvent } from '@react-three/fiber';
 import type { PlacedPart } from '../types/parts';
-import { isTubeType } from '../types/parts';
+import { isTubeType, isPanelType } from '../types/parts';
 import * as THREE from 'three';
 import {
   PART_COLORS, SELECTED_COLOR, PORT_OPEN_COLOR,
-  CONNECTOR_BODY_RADIUS, TUBE_RADIUS,
+  CONNECTOR_BODY_RADIUS, TUBE_RADIUS, ARM_RADIUS,
   TUBE_LENGTH, TUBE_15_LENGTH,
   PORT_INDICATOR_RADIUS,
   DIAG_CROSSING_TO_CLOSED, DIAG_PORT_A_OFFSET,
-  DIAG_ARM_TOTAL,
+  DIAG_PORT_B_BODY_END, DIAG_ARM_TOTAL,
+  PANEL_40_SIZE, PANEL_20_SIZE, PANEL_THICKNESS, DOUBLE_TUBE_SIZE,
 } from '../constants/geometry';
 import { getPortDefs } from '../geometry/portDefs';
 import { useDesignStore } from '../store/useDesignStore';
@@ -91,6 +92,26 @@ function ConnectorBody({ part, isSelected, onClick }: {
   );
 }
 
+// ─── Panel / Clamp Body ──────────────────────────────────────
+function PanelBody({ part, isSelected, onClick }: {
+  part: PlacedPart;
+  isSelected: boolean;
+  onClick: (e: ThreeEvent<MouseEvent>) => void;
+}) {
+  const color = isSelected ? SELECTED_COLOR : PART_COLORS[part.type];
+  const dims: [number, number, number] =
+    part.type === 'panel-40x40' ? [PANEL_40_SIZE, PANEL_THICKNESS, PANEL_40_SIZE] :
+    part.type === 'panel-40x20' ? [PANEL_40_SIZE, PANEL_THICKNESS, PANEL_20_SIZE] :
+    DOUBLE_TUBE_SIZE;
+
+  return (
+    <mesh onClick={onClick}>
+      <boxGeometry args={dims} />
+      <meshStandardMaterial color={color} metalness={0.1} roughness={0.8} />
+    </mesh>
+  );
+}
+
 // ─── Diagonal Connector Body ─────────────────────────────────
 // Renders two cylinders: horizontal sleeve + diagonal body/arm section.
 // The diagonal is unique: Port A is a sleeve, Port B is a standard arm.
@@ -115,13 +136,19 @@ function DiagonalBody({ part, isSelected, onClick }: {
   const sleeveLength = sleeveEnd - sleeveStart;
   const sleeveCenterZ = (sleeveStart + sleeveEnd) / 2;
 
-  // Diagonal section: from cut plane to arm end
+  // Diagonal body section: from cut plane to where the 40mm arm starts
   // Cut plane is at Z = +10mm from origin. Along the 45° diagonal axis,
   // the visible start is at t = 10mm / cos(45°) ≈ 14.14mm from origin.
   const diagStartT = DIAG_CROSSING_TO_CLOSED / S45; // ~0.01414
-  const diagEndT = DIAG_ARM_TOTAL;                    // 0.110
-  const diagLength = diagEndT - diagStartT;
-  const diagMidT = (diagStartT + diagEndT) / 2;
+  const diagBodyEndT = DIAG_PORT_B_BODY_END;          // 0.060 (where 40mm arm starts)
+  const diagBodyLength = diagBodyEndT - diagStartT;
+  const diagBodyMidT = (diagStartT + diagBodyEndT) / 2;
+
+  // Diagonal arm section: from body end to arm tip (40mm diameter, visible)
+  const diagArmStartT = DIAG_PORT_B_BODY_END;         // 0.060
+  const diagArmEndT = DIAG_ARM_TOTAL;                  // 0.110
+  const diagArmLength = diagArmEndT - diagArmStartT;   // 0.050
+  const diagArmMidT = (diagArmStartT + diagArmEndT) / 2;
 
   return (
     <>
@@ -135,13 +162,23 @@ function DiagonalBody({ part, isSelected, onClick }: {
         <meshStandardMaterial color={color} metalness={0.3} roughness={0.6} />
       </mesh>
 
-      {/* Diagonal section — cylinder along 45° direction */}
+      {/* Diagonal body section — 50mm diameter, from cut plane to arm start */}
       <mesh
-        position={[0, diagMidT * S45, diagMidT * S45]}
+        position={[0, diagBodyMidT * S45, diagBodyMidT * S45]}
         quaternion={[DIAG_QUAT.x, DIAG_QUAT.y, DIAG_QUAT.z, DIAG_QUAT.w]}
         onClick={onClick}
       >
-        <cylinderGeometry args={[TUBE_RADIUS, TUBE_RADIUS, diagLength, 16]} />
+        <cylinderGeometry args={[TUBE_RADIUS, TUBE_RADIUS, diagBodyLength, 16]} />
+        <meshStandardMaterial color={color} metalness={0.3} roughness={0.6} />
+      </mesh>
+
+      {/* Diagonal arm section — 40mm diameter, where tubes connect */}
+      <mesh
+        position={[0, diagArmMidT * S45, diagArmMidT * S45]}
+        quaternion={[DIAG_QUAT.x, DIAG_QUAT.y, DIAG_QUAT.z, DIAG_QUAT.w]}
+        onClick={onClick}
+      >
+        <cylinderGeometry args={[ARM_RADIUS, ARM_RADIUS, diagArmLength, 16]} />
         <meshStandardMaterial color={color} metalness={0.3} roughness={0.6} />
       </mesh>
 
@@ -176,6 +213,8 @@ export function PartMesh({ part, isSelected }: PartMeshProps) {
     >
       {isTubeType(part.type) ? (
         <TubeBody part={part} isSelected={isSelected} onClick={handleClick} />
+      ) : isPanelType(part.type) ? (
+        <PanelBody part={part} isSelected={isSelected} onClick={handleClick} />
       ) : part.type === 'diagonal' ? (
         <DiagonalBody part={part} isSelected={isSelected} onClick={handleClick} />
       ) : (

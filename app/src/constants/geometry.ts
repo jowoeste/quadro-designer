@@ -32,8 +32,16 @@ export const DIAG_PORT_A_OFFSET = 0.080;      // 80mm from origin to sleeve open
 export const DIAG_PORT_B_BODY_END = 0.060;    // 60mm from origin to where arm (40mm⌀) begins
 export const DIAG_ARM_TOTAL = 0.110;          // 110mm from origin to diagonal open end
 
+// === PANEL & CLAMP DIMENSIONS ===
+export const PANEL_THICKNESS = 0.004;          // ~4mm thick
+export const PANEL_40_SIZE = 0.40;             // 40cm
+export const PANEL_20_SIZE = 0.20;             // 20cm
+export const CLAMP_TUBE_SPACING = 0.45;        // 450mm = one cube side (tube center-to-center)
+export const CLAMP_TOLERANCE = 0.03;           // 30mm tolerance for detecting parallel tube pairs
+export const DOUBLE_TUBE_SIZE: [number, number, number] = [0.05, 0.03, 0.05]; // 50×30×50mm clamp block
+
 // === SNAP SYSTEM ===
-export const SNAP_DISTANCE = 0.15;            // Generous enough for easy snapping with smaller parts
+export const SNAP_DISTANCE = 0.20;            // Generous for easy snapping, especially diagonal arms
 
 // === PORT INDICATORS ===
 export const PORT_INDICATOR_RADIUS = 0.016;   // Visible on the connector sphere surface
@@ -51,6 +59,10 @@ export const PART_COLORS: Record<string, string> = {
   '6-way':           '#c0392b',   // Dark red
   'straight':        '#95a5a6',   // Silver/gray
   'diagonal':        '#e84393',   // Pink — stands out as the non-90° part
+  // Panels & clamps
+  'panel-40x40':           '#dfe6e9',   // Light gray
+  'panel-40x20':           '#b2bec3',   // Medium gray
+  'double-tube-connector': '#636e72',   // Dark gray
 };
 
 export const SELECTED_COLOR = '#f1c40f';       // Yellow: selected part highlight
